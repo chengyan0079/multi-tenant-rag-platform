@@ -155,8 +155,8 @@ class FileBatchItem(BaseModel):
 # ============ 文档索引（运营后台）============
 class DocCreateResult(BaseModel):
     tenant_id: int = Field(..., description="租户 id")
-    oss_key: str = Field(..., description="对象存储 key")
-    status: str = Field(..., description="状态")
+    doc_id: int = Field(..., description="文档索引记录 id（rag_document.id）")
+    status: str = Field(..., description="状态（pending/indexing/done/failed）")
 
 
 class DocStatusData(BaseModel):

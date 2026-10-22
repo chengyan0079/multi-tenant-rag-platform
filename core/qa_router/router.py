@@ -211,16 +211,18 @@ class QARouter:
         self, query: str, answer: str, chunks: list[RetrievedChunk], strategy: RetrievalStrategy | None,
         user_id: str | None = None,
     ) -> None:
-        """LLM 结果审计占位：记录生成链路审计信息（query/答案/片段/策略）。待实现。"""
-        # TODO: 写入审计日志（谁、何时、问什么、答什么、用了哪些片段与策略）
-        logger.debug(f'LLM 结果审计未实现，跳过 [strategy={strategy}, user={user_id}]')
+        """LLM 结果审计占位：审计/质量评估交由 RAGAS 评测管道，不在业务库持久化。"""
+        # 后续由 RAGAS 评测框架落地：question/answer/context/strategy 作为评测信号采集，
+        # 不在此做业务库写入（保留 no-op，避免无依赖时阻断主链路）。
+        logger.debug(f'LLM 结果审计交由 RAGAS 评测管道，跳过 [strategy={strategy}, user={user_id}]')
 
     async def record_rating(
         self, session_id: str | None, rating: int, comment: str = ''
     ) -> None:
-        """回答打分持久化占位：用户对回答打分（建议 1-5）并可选留言，落库待实现。
+        """回答打分占位：用户打分作为 RAGAS 评测信号，后续由评测管道采集，不走业务库持久化。
 
         由接入层在用户提交打分时调用。
         """
-        # TODO: 持久化评分，关联 session_id 与对应回答
-        logger.debug(f'回答打分持久化未实现，跳过 [session={session_id}, rating={rating}]')
+        # 后续由 RAGAS 评测框架落地：rating/comment 作为评测反馈信号，
+        # 不在此做业务库写入（保留 no-op，避免无依赖时阻断主链路）。
+        logger.debug(f'回答打分交由 RAGAS 评测管道，跳过 [session={session_id}, rating={rating}]')

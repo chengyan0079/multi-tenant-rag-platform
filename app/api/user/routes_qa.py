@@ -45,12 +45,25 @@ def _require_user(request: Request) -> str:
 
 @router.post("/chat", summary="对话问答（SSE 流式）")
 async def chat(req: ChatRequest, tenant_id: int = Depends(resolve_tenant)):
-    """对话主入口（SSE 流式）：FAQ 优先 + RAG 兜底，按 (用户) 隔离写入会话历史。"""
+    """对话主入口（SSE 流式）：FAQ 优先 + RAG 兜底，按 (用户, 会话) 隔离写入历史。
+
+    session_id 由 /v1/sessions 创建后随请求体传入，缺失则拒绝——
+    必须先建会话再发起检索（租户/用户身份经 X-Tenant-Id / X-User-Id 头下发）。
+    """
     user_id = user_id_ctx.get()
+    session_id = req.session_id
+    if not session_id:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "缺少会话标识：请先调用 /v1/sessions 创建会话，"
+                "并在请求体中传入 session_id"
+            ),
+        )
     router_ = QARouter()
     # 进入前清掉可能残留的停止标记，避免误停本次生成
-    if user_id and req.session_id:
-        await clear_chat_stop(user_id, req.session_id)
+    if user_id and session_id:
+        await clear_chat_stop(user_id, session_id)
 
     async def event_gen():
         source = None
@@ -59,10 +72,10 @@ async def chat(req: ChatRequest, tenant_id: int = Depends(resolve_tenant)):
         try:
             async for event, payload in router_.answer_stream(
                 query=req.query, tenant_id=tenant_id, user_id=user_id,
-                session_id=req.session_id,
+                session_id=session_id,
             ):
                 # 停止检查：每个事件产出前检查取消标记（Redis，跨 worker 生效）
-                if user_id and req.session_id and await is_chat_stopped(user_id, req.session_id):
+                if user_id and session_id and await is_chat_stopped(user_id, session_id):
                     stopped = True
                     break
                 if event == "meta":
@@ -75,31 +88,38 @@ async def chat(req: ChatRequest, tenant_id: int = Depends(resolve_tenant)):
             yield {"event": "error", "data": json.dumps({"msg": "服务内部错误"}, ensure_ascii=False)}
             return
         finally:
-            if user_id and req.session_id:
-                await clear_chat_stop(user_id, req.session_id)
+            if user_id and session_id:
+                await clear_chat_stop(user_id, session_id)
 
         if stopped:
             yield {"event": "stopped", "data": json.dumps({"msg": "已停止"}, ensure_ascii=False)}
             yield {"event": "done", "data": "{}"}
 
         # 历史回写：按 (用户, 会话) 隔离；缺 user_id 时不写，避免串号（停止时写已生成部分）
-        if user_id and req.session_id and source in ("faq", "rag"):
+        if user_id and session_id and source in ("faq", "rag"):
             svc = SessionService()
-            await svc.append_turn(user_id, req.session_id, "user", req.query)
-            await svc.append_turn(user_id, req.session_id, "assistant", "".join(full_answer))
+            await svc.append_turn(user_id, session_id, "user", req.query)
+            await svc.append_turn(user_id, session_id, "assistant", "".join(full_answer))
 
     return EventSourceResponse(event_gen())
 
 
 @router.post("/chat/stop", response_model=ApiResponse[OkData], summary="停止当前会话的流式生成")
 async def chat_stop(req: StopRequest, request: Request):
-    """停止当前会话进行中的流式生成（幂等：无进行中生成也返回成功）。"""
+    """停止当前会话进行中的流式生成（幂等：无进行中生成也返回成功）。
+
+    session_id 随请求体传入（由 /v1/sessions 创建），缺失由 pydantic 校验拒绝。
+    """
     uid = _require_user(request)
     await set_chat_stop(uid, req.session_id)
     return success(OkData())
 
 
-@router.delete("/chat/context/{session_id}", response_model=ApiResponse[OkData], summary="删除当前会话窗口记忆")
+@router.delete(
+    "/chat/context/{session_id}",
+    response_model=ApiResponse[OkData],
+    summary="删除当前会话窗口记忆",
+)
 async def delete_context(session_id: str, request: Request):
     """删除当前会话的窗口记忆（压缩上下文），不影响对话历史与会话本身。"""
     uid = _require_user(request)

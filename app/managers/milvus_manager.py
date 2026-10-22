@@ -35,13 +35,12 @@ class MilvusManager(Manager):
         # 2) 库级客户端 + 绑定模型（置于 Model 之后，创建集合需要 dense_dim）
         client = AsyncMilvusClient(uri=uri, db_name=db_name)
         store = MilvusStore(client=client)
-        store.bind(client, app_state.model)
+        store.bind(client, app_state.model_service)
         # 3) 确保集合存在：不存在则创建 + 索引，已存在则直接加载（幂等）
         await store.ensure_collection()
-        app_state.milvus = client
         app_state.milvus_store = store
         logger.info(f'Milvus 就绪（db={db_name}, collection={config.MILVUS_COLLECTION}）')
 
     async def stop(self) -> None:
-        if app_state.milvus:
-            await app_state.milvus.close()
+        if app_state.milvus_store and app_state.milvus_store.client:
+            await app_state.milvus_store.client.close()

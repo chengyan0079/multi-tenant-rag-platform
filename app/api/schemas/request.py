@@ -25,11 +25,11 @@ NonBlank = Annotated[str, AfterValidator(_non_blank)]
 
 class ChatRequest(BaseModel):
     query: NonBlank = Field(..., max_length=2000, description="【必填】用户问题")
-    session_id: str | None = Field(None, max_length=64, description="【可选】会话 id（服务端生成，见 /v1/sessions）")
+    session_id: str | None = Field(None, max_length=64, description="【可选】会话 id（由 /v1/sessions 创建，随请求体传入）")
 
 
 class StopRequest(BaseModel):
-    session_id: NonBlank = Field(..., max_length=64, description="【必填】要停止生成的会话 id")
+    session_id: NonBlank = Field(..., max_length=64, description="【必填】要停止生成的会话 id（由 /v1/sessions 创建）")
 
 
 class TurnRequest(BaseModel):
@@ -49,9 +49,8 @@ class FaqRequest(BaseModel):
 
 
 class DocRequest(BaseModel):
-    oss_key: NonBlank = Field(..., max_length=512, description="【必填】文件在对象存储中的 key")
+    file_id: int = Field(..., description="【必填】上传后得到的文档ID（rag_file.id）")
     doc_type: Literal[0, 1] = Field(0, description="【可选】文档类型：0=普通文档 1=FAQ 来源")
-    source_path: str | None = Field(None, max_length=512, description="【可选】源文件路径（溯源/去重）")
 
 
 class RetrieveRequest(BaseModel):

@@ -54,28 +54,28 @@ def test_collect_routes_expands_included_routers() -> None:
 
 def test_tool_calls_api_in_process() -> None:
     """工具以进程内 ASGI 调用 API（不经网络）：路径参数 / 请求体均生效。"""
-    app_state.app = _make_app()
+    app_state.fastapi_app = _make_app()
     try:
         assert asyncio.run(m._make_tool('GET', '/admin/files/{oss_key}')(
             path_params={'oss_key': 'a.pdf'})) == '{"key":"a.pdf"}'
         assert asyncio.run(m._make_tool('POST', '/echo')(body={'x': 1})) == '{"got":{"x":1}}'
     finally:
-        app_state.app = None
+        app_state.fastapi_app = None
 
 
 def test_start_disabled_skips(monkeypatch) -> None:
     monkeypatch.setattr(config, 'MCP_API_ENABLED', False)
-    app_state.app = _make_app()
+    app_state.fastapi_app = _make_app()
     try:
         with mock.patch.object(m.threading, 'Thread') as th:
             asyncio.run(m.MCPApiManager().start())
         th.assert_not_called()
     finally:
-        app_state.app = None
+        app_state.fastapi_app = None
 
 
 def test_start_registers_tools_and_spawns_thread(monkeypatch) -> None:
-    app_state.app = _make_app()
+    app_state.fastapi_app = _make_app()
     captured: dict = {}
 
     class _FakeThread:
@@ -91,7 +91,7 @@ def test_start_registers_tools_and_spawns_thread(monkeypatch) -> None:
         with mock.patch.object(m.threading, 'Thread', _FakeThread):
             asyncio.run(m.MCPApiManager().start())
         assert captured.get('started') is True
-        assert app_state.mcp_api is not None      # MCP 服务已构建并注入
+        assert app_state.mcp_server is not None      # MCP 服务已构建并注入
     finally:
-        app_state.app = None
-        app_state.mcp_api = None
+        app_state.fastapi_app = None
+        app_state.mcp_server = None

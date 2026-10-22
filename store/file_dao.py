@@ -142,3 +142,12 @@ class FileDao:
             f.status = 0
             await session.commit()
             return True
+
+    async def get_oss_key(self, tenant_id: int, file_id: int) -> tuple[str | None, str | None]:
+        """取文档当前版本的对象 key 与文件名（供索引投递；不存在返回 (None, None)）。"""
+        async with self._factory() as session:
+            row = (await session.execute(
+                select(File.current_oss_key, File.file_name).where(
+                    File.id == file_id, File.tenant_id == tenant_id)
+            )).first()
+        return (row.current_oss_key, row.file_name) if row else (None, None)

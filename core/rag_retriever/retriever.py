@@ -79,7 +79,7 @@ class Retriever:
         model: ModelService | None = None,
     ) -> None:
         self.store = store or app_state.milvus_store
-        self.model = model or app_state.model
+        self.model = model or app_state.model_service
 
     async def retrieve(
         self,

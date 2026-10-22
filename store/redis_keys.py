@@ -64,3 +64,12 @@ def prompt_key(data_id: str) -> str:
 def auth_nonce_key(nonce: str) -> str:
     """签名 nonce 去重 key：rag:authnonce:<nonce>（写入带 TTL，过期自动清理）。"""
     return build_key(*KeyPrefix.AUTH_NONCE, nonce)
+
+
+# 文档索引任务队列（跨租户，全局，不按 tenant 分段）
+INDEX_QUEUE = ("rag", "index_queue")
+
+
+def index_queue_key() -> str:
+    """文档索引任务队列 key：rag:index_queue（IndexManager 消费，崩溃恢复扫描 status=0）。"""
+    return build_key(*INDEX_QUEUE)

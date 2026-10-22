@@ -10,11 +10,9 @@ X-Trace-Id 透传全链路，并在响应头回写。
 未对接 Java 网关前（IDENTITY_DEFAULT_ENABLED=True）：请求未带身份头时兜底为
 DEFAULT_TENANT_ID / DEFAULT_USER_ID，方便本地自测；网关接入后关掉该开关即恢复"缺头即拒"。
 """
-import uuid
-
 from fastapi import Depends, Header, HTTPException
 
-from app.app_state import tenant_id_ctx, user_id_ctx, trace_id_ctx
+from app.app_state import tenant_id_ctx, user_id_ctx
 from common.config import config
 
 
@@ -31,9 +29,12 @@ def default_user_id() -> str | None:
 async def resolve_tenant(
     x_tenant_id: str | None = Header(default=None, alias="X-Tenant-Id"),  # 租户 id（网关下发）
     x_user_id: str | None = Header(default=None, alias="X-User-Id"),     # 用户 id（网关下发）
-    x_trace_id: str | None = Header(default=None, alias="X-Trace-Id"),   # 全链路 trace id
 ) -> int:
-    """解析并写入租户/用户/链路上下文，返回租户 id。"""
+    """解析并写入租户/用户上下文，返回租户 id。
+
+    trace_id 由 TraceMiddleware 在请求最外层统一兜底生成并回写响应头，
+    此处不再处理，直接透传，避免两层各生成一份导致链路 id 不一致。
+    """
     if x_tenant_id:
         try:
             tid = int(x_tenant_id)
@@ -44,9 +45,6 @@ async def resolve_tenant(
         if tid is None:
             raise HTTPException(status_code=401, detail="缺少 X-Tenant-Id 请求头")
 
-    # trace_id 由 TraceMiddleware 统一设置；此处仅在缺失时兜底，避免覆盖导致日志与响应头不一致
-    if trace_id_ctx.get() is None:
-        trace_id_ctx.set(x_trace_id or uuid.uuid4().hex)
     tenant_id_ctx.set(tid)
     user_id_ctx.set(x_user_id or default_user_id())
     return tid

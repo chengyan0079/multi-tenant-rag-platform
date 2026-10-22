@@ -14,7 +14,7 @@ class ApiLogDao:
 
     async def save(self, record: dict[str, Any]) -> None:
         """写入一行；引擎未就绪或写库异常时仅告警。"""
-        if app_state.engine is None:
+        if app_state.db_engine is None:
             return                      # MySQL 未启动（如单测/降级），跳过落库
         try:
             from store.mysql_store import get_sessionmaker

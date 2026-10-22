@@ -33,7 +33,7 @@ class NacosDiscoverManager(Manager):
             logger.info('Nacos 未启用（NACOS_ENABLED=False），跳过注册')
             return
         # 健康检查据此判断注册状态；未启用时不写入，探活即为 False
-        app_state.nacos_discover = self
+        app_state.nacos_discovery = self
         try:
             from v2.nacos import ClientConfig, NacosNamingService, RegisterInstanceParam
         except ImportError:
@@ -68,7 +68,7 @@ class NacosDiscoverManager(Manager):
 
     async def stop(self) -> None:
         self._registered = False
-        app_state.nacos_discover = None
+        app_state.nacos_discovery = None
         if self._naming is None:
             return
         try:

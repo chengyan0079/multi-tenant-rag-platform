@@ -39,10 +39,10 @@ class ModelManager(Manager):
             except Exception as e:
                 # 单个模型失败不阻断其他模型与服务启动（如意图分类缺失即降级）
                 logger.warning(f'模型预加载失败（已降级，不影响启动）: {loader.name}: {e}')
-        if app_state.model is None:
+        if app_state.model_service is None:
             # 保证容器存在，避免后续 embed/rerank 调用报 None
             from core.rag_model.model_service import ModelService
-            app_state.model = ModelService()
+            app_state.model_service = ModelService()
         logger.info(f'模型预加载完成: {loaded}')
 
     async def stop(self) -> None:

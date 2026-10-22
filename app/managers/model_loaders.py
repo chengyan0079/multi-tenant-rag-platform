@@ -28,18 +28,18 @@ class ModelLoader(ABC):
 
 
 def _ensure_service() -> Any:
-    """保证 app_state.model 容器存在（嵌入与重排共享同一 ModelService 实例）。
+    """保证 app_state.model_service 容器存在（嵌入与重排共享同一 ModelService 实例）。
 
     延迟导入 ModelService，避免其依赖（pymilvus 等）在模块加载期就传染到 Manager。
     """
-    if app_state.model is None:
+    if app_state.model_service is None:
         from core.rag_model.model_service import ModelService
-        app_state.model = ModelService()
-    return app_state.model
+        app_state.model_service = ModelService()
+    return app_state.model_service
 
 
 class EmbeddingModelLoader(ModelLoader):
-    """BGE-M3 向量模型预加载，注入 app_state.model.embedding_function。"""
+    """BGE-M3 向量模型预加载，注入 app_state.model_service.embedding_function。"""
 
     name = 'bge-m3(embedding)'
 
@@ -48,12 +48,12 @@ class EmbeddingModelLoader(ModelLoader):
         await asyncio.to_thread(svc.load_embedding)
 
     async def unload(self) -> None:
-        if app_state.model is not None:
-            app_state.model.embedding_function = None
+        if app_state.model_service is not None:
+            app_state.model_service.embedding_function = None
 
 
 class RerankerModelLoader(ModelLoader):
-    """BGE-Reranker 预加载，注入 app_state.model.reranker。"""
+    """BGE-Reranker 预加载，注入 app_state.model_service.reranker。"""
 
     name = 'bge-reranker'
 
@@ -62,8 +62,8 @@ class RerankerModelLoader(ModelLoader):
         await asyncio.to_thread(svc.load_reranker)
 
     async def unload(self) -> None:
-        if app_state.model is not None:
-            app_state.model.reranker = None
+        if app_state.model_service is not None:
+            app_state.model_service.reranker = None
 
 
 class IntentClassifierLoader(ModelLoader):

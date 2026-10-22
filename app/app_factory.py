@@ -33,24 +33,23 @@ from app.managers.file_provider_manager import FileProviderManager
 from app.managers.nacos_config_manager import NacosConfigManager
 from app.managers.nacos_discover_manager import NacosDiscoverManager
 from app.managers.mcp_api_manager import MCPApiManager
+from app.managers.index_manager import IndexManager
 
 
 def build_server() -> AppServer:
     """按 stage 注册全部启动项（stage 内并发、stage 间按序）。"""
     server = AppServer("rag-ultra")
-    server.register(LoggingManager(), order=10, stage=0)
-    server.register(RedisManager(), order=20, stage=1)
-    server.register(MySQLManager(), order=30, stage=1)
-    server.register(ModelManager(), order=50, stage=1)
-    server.register(FileProviderManager(), order=60, stage=1)
-    # stage 2：依赖 stage 1
-    server.register(MilvusManager(), order=55, stage=2)      # 依赖 Model（在其后）
-    server.register(FaqCacheManager(), order=65, stage=2)    # 依赖 Redis+MySQL
-    server.register(NacosConfigManager(), order=105, stage=2)  # 依赖 Redis
-    # stage 3：服务注册放最后
-    server.register(NacosDiscoverManager(), order=110, stage=3)
-    # MCP API：需路由已挂载（app_state.app 就绪），故放最后
-    server.register(MCPApiManager(), order=120, stage=3)
+    server.register(LoggingManager(), order=10, stage=0)            # 奠基：日志
+    server.register(RedisManager(), order=20, stage=1)              # 基础组件
+    server.register(MySQLManager(), order=30, stage=1)              # 基础组件
+    server.register(ModelManager(), order=50, stage=1)              # 基础组件
+    server.register(MilvusManager(), order=55, stage=2)             # 依赖 Model（stage 在其后）
+    server.register(FileProviderManager(), order=60, stage=1)       # 基础组件
+    server.register(FaqCacheManager(), order=65, stage=2)           # 依赖 Redis+MySQL
+    server.register(NacosConfigManager(), order=105, stage=2)       # 依赖 Redis
+    server.register(NacosDiscoverManager(), order=110, stage=3)     # 服务注册
+    server.register(IndexManager(), order=115, stage=3)             # 后台消费（仅起协程，不阻塞）
+    server.register(MCPApiManager(), order=120, stage=3)            # 需路由已挂载，最后
     return server
 
 
@@ -88,5 +87,5 @@ def create_app() -> FastAPI:
 
     app.router.lifespan_context = lifespan
     configure_routes(app)
-    app_state.app = app
+    app_state.fastapi_app = app
     return app

@@ -39,7 +39,7 @@ def _build_engine():
 
 async def _main() -> None:
     engine = _build_engine()
-    app_state.engine = engine
+    app_state.db_engine = engine
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 

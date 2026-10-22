@@ -13,12 +13,12 @@ from store.redis_store import ping as redis_ping
 
 def _mcp_ok() -> bool:
     """MCP API 服务是否就绪：MCPApiManager 注册完工具后会把 FastMCP 实例写入 app_state。"""
-    return app_state.mcp_api is not None
+    return app_state.mcp_server is not None
 
 
 def _nacos_ok() -> bool:
     """Nacos 服务发现是否就绪：以 Manager 记录的注册结果为准（未启用时无 Manager）。"""
-    mgr = app_state.nacos_discover
+    mgr = app_state.nacos_discovery
     return mgr is not None and bool(getattr(mgr, 'is_registered', False))
 
 
@@ -32,15 +32,16 @@ class HealthDao:
     async def check(self) -> dict:
         milvus_ok = False
         try:
-            if app_state.milvus:
-                milvus_ok = await app_state.milvus.has_collection(app_state.settings.MILVUS_COLLECTION)
+            if app_state.milvus_store and app_state.milvus_store.client:
+                milvus_ok = await app_state.milvus_store.client.has_collection(
+                    app_state.settings.MILVUS_COLLECTION)
         except Exception:  # noqa: BLE001  探活失败不影响整体，置 False
             milvus_ok = False
         return {
             "redis": await redis_ping(),
             "mysql": await mysql_ping(),
             "milvus": bool(milvus_ok),
-            "model": app_state.model is not None,
+            "model": app_state.model_service is not None,
             "mcp": _mcp_ok(),
             "nacos": _nacos_ok(),
             "config_center": _config_center_ok(),

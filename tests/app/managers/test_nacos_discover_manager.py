@@ -56,13 +56,13 @@ def _install_fake_sdk(monkeypatch, fake: _FakeNaming) -> None:
 @pytest.fixture(autouse=True)
 def _clean_state():
     yield
-    app_state.nacos_discover = None
+    app_state.nacos_discovery = None
 
 
 def test_disabled_skips_registration(monkeypatch) -> None:
     monkeypatch.setattr(config, 'NACOS_ENABLED', False)
     asyncio.run(m.NacosDiscoverManager().start())
-    assert app_state.nacos_discover is None        # 未启用：健康检查读到 False
+    assert app_state.nacos_discovery is None        # 未启用：健康检查读到 False
 
 
 def test_register_success_sets_state(monkeypatch) -> None:
@@ -73,12 +73,12 @@ def test_register_success_sets_state(monkeypatch) -> None:
     mgr = m.NacosDiscoverManager()
     asyncio.run(mgr.start())
     assert mgr.is_registered is True
-    assert app_state.nacos_discover is mgr
+    assert app_state.nacos_discovery is mgr
     assert fake.registered.service_name == config.SERVICE_NAME
 
     asyncio.run(mgr.stop())
     assert mgr.is_registered is False
-    assert app_state.nacos_discover is None
+    assert app_state.nacos_discovery is None
     assert fake.deregistered is not None and fake.closed is True
 
 

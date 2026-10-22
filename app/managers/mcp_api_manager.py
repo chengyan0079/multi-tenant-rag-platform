@@ -1,6 +1,6 @@
 """MCPApiManager - 启动项：把 app 的 HTTP API 封装成 MCP 工具，起 MCP 服务供外部调用。
 
-启动时机：stage 3（路由已挂载、app_state.app 就绪）。流程：
+启动时机：stage 3（路由已挂载、app_state.fastapi_app 就绪）。流程：
   1. 遍历 FastAPI 路由，为每个 API 生成一个 MCP 工具（排除文档 / 自描述 / 探活路径）；
   2. 注册到 FastMCP("rag-ultra-api")；
   3. 在**守护线程**起 MCP 服务（默认 streamable-http），外部客户端连
@@ -107,7 +107,7 @@ def _make_tool(method: str, path: str):
         if '{' in url:
             raise ValueError(f'缺少路径参数: {url}（path_params={path_params}）')
         async with AsyncClient(
-            transport=ASGITransport(app=app_state.app), base_url='http://mcp-api',
+            transport=ASGITransport(app=app_state.fastapi_app), base_url='http://mcp-api',
         ) as client:
             resp = await client.request(
                 method, url,
@@ -142,13 +142,13 @@ class MCPApiManager(Manager):
         if not config.MCP_API_ENABLED:
             logger.info('MCP API 服务未启用（MCP_API_ENABLED=False），跳过')
             return
-        app = app_state.app
+        app = app_state.fastapi_app
         if app is None:
             logger.warning('FastAPI app 未就绪，跳过 MCP API 工具注册')
             return
 
         mcp, routes = build_mcp_api_server(app)
-        app_state.mcp_api = mcp
+        app_state.mcp_server = mcp
         self._thread = threading.Thread(
             target=self._serve, args=(mcp,), name='mcp-api-server', daemon=True)
         self._thread.start()
@@ -158,7 +158,7 @@ class MCPApiManager(Manager):
 
     async def stop(self) -> None:
         # 服务在守护线程中随进程退出；此处仅清理引用
-        app_state.mcp_api = None
+        app_state.mcp_server = None
         self._thread = None
 
     @staticmethod

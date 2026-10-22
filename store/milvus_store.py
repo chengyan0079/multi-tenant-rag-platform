@@ -179,6 +179,6 @@ class MilvusStore:
 if __name__ == '__main__':
     setup_logging()
     store = MilvusStore()
-    # store.bind(app_state.milvus, ModelService())
+    # store.bind(client, ModelService())
     # hits = asyncio.run(store.hybrid_search('学习AI大模型课程能够掌握哪些核心竞争力？', scope=0, tenant_id=1))
     # print(hits)

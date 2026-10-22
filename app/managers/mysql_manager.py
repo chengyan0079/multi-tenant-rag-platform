@@ -35,16 +35,16 @@ class MySQLManager(Manager):
             f'mysql+aiomysql://{config.MYSQL_USER}:{config.MYSQL_PASSWORD}'
             f'@{config.MYSQL_HOST}:{config.MYSQL_PORT}/{db}?charset=utf8mb4'
         )
-        app_state.engine = create_async_engine(
+        app_state.db_engine = create_async_engine(
             app_dsn, pool_pre_ping=True,
             pool_size=config.MYSQL_POOL_MAX_SIZE,
         )
         try:
-            async with app_state.engine.connect() as conn:
+            async with app_state.db_engine.connect() as conn:
                 await conn.execute(text('SELECT 1'))
         except Exception as e:  # noqa: BLE001  分类：库不存在 vs 连不上/无权限
-            await app_state.engine.dispose()
-            app_state.engine = None
+            await app_state.db_engine.dispose()
+            app_state.db_engine = None
             if _is_unknown_database(e):
                 raise StartupError(
                     f"MySQL 数据库 {db!r} 不存在，请先创建（执行 scripts/schema.sql 会自动建库）"
@@ -56,5 +56,5 @@ class MySQLManager(Manager):
 
     async def stop(self) -> None:
         # dispose 关闭整个连接池，比逐个 close 更彻底
-        if app_state.engine:
-            await app_state.engine.dispose()
+        if app_state.db_engine:
+            await app_state.db_engine.dispose()

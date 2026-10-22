@@ -50,6 +50,10 @@ class _FakeSession:
     def add(self, row):
         self.added.append(row)
 
+    def add_all(self, rows):
+        for r in rows:
+            self.add(r)
+
     def _assign_id(self, row):
         if getattr(row, "id", None) is None:
             self._auto += 1
@@ -225,8 +229,38 @@ def test_file_get_and_batch(fake_provider):
 # ================= DocDao / HealthDao =================
 def test_doc_dao():
     import asyncio
-    assert asyncio.run(DocDao().create(1, "oss/x")) == "indexing"
-    assert asyncio.run(DocDao().get_status(7)) == "pending"
+    from store.orm_models.file import File
+    from store.orm_models.knowledge import Doc
+
+    # create: 关联 rag_file 落 rag_document，返回自增 id，初始 status=0
+    f = File(id=3, tenant_id=1, base_key="doc", current_file_hash="h",
+             current_oss_key="oss/k", file_name="f.pdf", status=1)
+    sess = _FakeSession(exec_results=[_Result(f)])
+    doc_id = asyncio.run(DocDao(factory=lambda: sess).create(1, 3, 0))
+    assert doc_id == 1
+    assert isinstance(sess.added[0], Doc)
+    assert sess.added[0].tenant_id == 1 and sess.added[0].file_upload_id == 3
+    assert sess.added[0].file_hash == "h" and sess.added[0].status == 0
+    assert sess.committed == 1
+
+    # get_status: 返回 {status, chunk_count, err_msg}
+    d = Doc(id=7, tenant_id=1, status=2, chunk_count=4, err_msg=None)
+    sess2 = _FakeSession(exec_results=[_Result(d)])
+    assert asyncio.run(DocDao(factory=lambda: sess2).get_status(7)) == {
+        "status": 2, "chunk_count": 4, "err_msg": None}
+
+    # update_status: 回写状态（含 err_msg 截断）
+    d3 = Doc(id=7, tenant_id=1, status=0)
+    sess3 = _FakeSession(exec_results=[_Result(d3)])
+    asyncio.run(DocDao(factory=lambda: sess3).update_status(7, 3, chunk_count=2, err_msg="boom"))
+    assert d3.status == 3 and d3.chunk_count == 2 and d3.err_msg == "boom"
+
+    # save_chunks: 先删后插，幂等
+    chunks = [{"text": "t1", "parent_id": "p0", "parent_content": "pc",
+               "doc_name": "f.pdf", "page": 0, "ref_id": 0}]
+    sess4 = _FakeSession(exec_results=[_Result(None)])
+    n = asyncio.run(DocDao(factory=lambda: sess4).save_chunks(1, 7, 0, chunks))
+    assert n == 1 and len(sess4.added) == 1 and sess4.committed == 1
 
 
 def test_health_dao(monkeypatch):
@@ -244,11 +278,13 @@ def test_health_dao(monkeypatch):
 
     monkeypatch.setattr(health_dao_module, "redis_ping", _redis)
     monkeypatch.setattr(health_dao_module, "mysql_ping", _mysql)
-    monkeypatch.setattr(app_state, "milvus", _Milvus())
-    monkeypatch.setattr(app_state, "model", object())
+    class _Store:
+        client = _Milvus()
+    monkeypatch.setattr(app_state, "milvus_store", _Store())
+    monkeypatch.setattr(app_state, "model_service", object())
     d = asyncio.run(HealthDao().check())
     assert d["redis"] is True and d["mysql"] is False and d["milvus"] is True and d["model"] is True
-    monkeypatch.setattr(app_state, "milvus", None)
+    monkeypatch.setattr(app_state, "milvus_store", None)
     assert asyncio.run(HealthDao().check())["milvus"] is False
 
 
@@ -261,23 +297,23 @@ def test_health_dao_extra_components(monkeypatch):
 
     monkeypatch.setattr(health_dao_module, "redis_ping", _no)
     monkeypatch.setattr(health_dao_module, "mysql_ping", _no)
-    monkeypatch.setattr(app_state, "milvus", None)
-    monkeypatch.setattr(app_state, "model", None)
+    monkeypatch.setattr(app_state, "milvus_store", None)
+    monkeypatch.setattr(app_state, "model_service", None)
 
     # 全部未注入：三项都是 False
-    monkeypatch.setattr(app_state, "mcp_api", None)
-    monkeypatch.setattr(app_state, "nacos_discover", None)
+    monkeypatch.setattr(app_state, "mcp_server", None)
+    monkeypatch.setattr(app_state, "nacos_discovery", None)
     monkeypatch.setattr(app_state, "config_center", None)
     d = asyncio.run(HealthDao().check())
     assert d["mcp"] is False and d["nacos"] is False and d["config_center"] is False
 
     # 已就绪：MCP 注入实例、Nacos 注册成功标记、loader 已启动
-    monkeypatch.setattr(app_state, "mcp_api", object())
-    monkeypatch.setattr(app_state, "nacos_discover", SimpleNamespace(is_registered=True))
+    monkeypatch.setattr(app_state, "mcp_server", object())
+    monkeypatch.setattr(app_state, "nacos_discovery", SimpleNamespace(is_registered=True))
     monkeypatch.setattr(app_state, "config_center", SimpleNamespace(is_started=True))
     d = asyncio.run(HealthDao().check())
     assert d["mcp"] is True and d["nacos"] is True and d["config_center"] is True
 
     # 有 Manager 但未注册成功（注册失败被旁路）仍为 False
-    monkeypatch.setattr(app_state, "nacos_discover", SimpleNamespace(is_registered=False))
+    monkeypatch.setattr(app_state, "nacos_discovery", SimpleNamespace(is_registered=False))
     assert asyncio.run(HealthDao().check())["nacos"] is False

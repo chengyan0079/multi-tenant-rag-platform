@@ -9,6 +9,7 @@ Version: 0.0.1
 from pathlib import Path
 from typing import Annotated
 
+from dotenv import load_dotenv
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
@@ -16,6 +17,10 @@ from core.config_center.groups import ConfigGroup
 
 # 根布局下：config.py 位于 <ROOT>/common/config.py，需向上 2 级到达项目根
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# 尽早加载 .env：用 BASE_DIR 精确定位，文件中的值覆盖已存在的系统环境变量（override=True），
+# 必须在下方 Config（BaseSettings）读取环境变量之前执行。
+load_dotenv(dotenv_path=BASE_DIR / '.env', override=True)
 
 
 class Config(BaseSettings):

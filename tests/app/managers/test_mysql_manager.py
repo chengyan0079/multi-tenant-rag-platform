@@ -62,39 +62,39 @@ def _factory(error: Exception | None = None):
 
 def test_mysql_start_ok() -> None:
     MySQLManager, mod = _import_manager()
-    app_state.engine = None
+    app_state.db_engine = None
     try:
         with mock.patch.object(mod, 'create_async_engine', _factory(None)):
             asyncio.run(MySQLManager().start())
-        assert app_state.engine is not None
+        assert app_state.db_engine is not None
     finally:
-        app_state.engine = None
+        app_state.db_engine = None
 
 
 def test_mysql_start_fails_when_db_missing() -> None:
     MySQLManager, mod = _import_manager()
     from app.server import StartupError
-    app_state.engine = None
+    app_state.db_engine = None
     try:
         with mock.patch.object(mod, 'create_async_engine', _factory(_UnknownDBError())):
             with pytest.raises(StartupError):
                 asyncio.run(MySQLManager().start())
-        assert app_state.engine is None   # 失败后清理，不留半初始化引擎
+        assert app_state.db_engine is None   # 失败后清理，不留半初始化引擎
     finally:
-        app_state.engine = None
+        app_state.db_engine = None
 
 
 def test_mysql_start_fails_when_cannot_connect() -> None:
     MySQLManager, mod = _import_manager()
     from app.server import StartupError
-    app_state.engine = None
+    app_state.db_engine = None
     try:
         with mock.patch.object(mod, 'create_async_engine', _factory(RuntimeError("connect failed"))):
             with pytest.raises(StartupError):
                 asyncio.run(MySQLManager().start())
-        assert app_state.engine is None
+        assert app_state.db_engine is None
     finally:
-        app_state.engine = None
+        app_state.db_engine = None
 
 
 def test_is_unknown_database() -> None:

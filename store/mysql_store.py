@@ -1,7 +1,7 @@
 """
 mysql_store - MySQL 异步连接与会话（M3 元数据）
 
-引擎与连接池由 AppServer 的 MySQLManager 创建并注入 app_state.engine；
+引擎与连接池由 AppServer 的 MySQLManager 创建并注入 app_state.db_engine；
 本模块提供会话工厂与查询辅助。生产环境建议改用 Alembic 迁移。
 """
 from typing import AsyncGenerator
@@ -14,10 +14,10 @@ from common.logger import logger
 
 
 def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
-    """基于 app_state.engine 创建会话工厂。"""
-    if app_state.engine is None:
+    """基于 app_state.db_engine 创建会话工厂。"""
+    if app_state.db_engine is None:
         raise RuntimeError('MySQL 引擎未初始化，请确认 MySQLManager 已启动')
-    return async_sessionmaker(app_state.engine, class_=AsyncSession, expire_on_commit=False)
+    return async_sessionmaker(app_state.db_engine, class_=AsyncSession, expire_on_commit=False)
 
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
