@@ -1,0 +1,97 @@
+name: rag-pro
+
+services:
+  etcd:
+    container_name: milvus-etcd
+    image: quay.io/coreos/etcd:v3.5.14
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_ENABLE_V2=true
+    volumes:
+      - ./volumes/etcd:/etcd-data
+    command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd-data
+    restart: unless-stopped
+
+  minio:
+    container_name: milvus-minio
+    image: cgr.dev/chainguard/minio:latest
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - ./volumes/minio:/data
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    restart: unless-stopped
+    healthcheck:
+      test: [ "CMD", "minio", "admin", "info", "http://localhost:9000" ]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 10s
+
+  milvus:
+    container_name: milvus-standalone
+    image: milvusdb/milvus:v2.4.0
+    command: ["milvus", "run", "standalone"]
+    environment:
+      - ETCD_ENDPOINTS=etcd:2379
+      - MINIO_ADDRESS=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+    volumes:
+      - ./volumes/milvus:/var/lib/milvus
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    depends_on:
+      - etcd
+      - minio
+    restart: unless-stopped
+
+  redis:
+    container_name: redis-server
+    image: redis:8.10
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./volumes/redis:/data
+    command: redis-server --appendonly yes --requirepass 1234
+
+  mysql:
+    image: mysql:8.4
+    container_name: mysql-server
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: rag_ultra
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --innodb-buffer-pool-size=512M
+      - --local-infile=1
+    volumes:
+      - ./volumes/mysql:/var/lib/mysql
+
+  attu:
+    image: zilliz/attu:v2.4.12
+    container_name: milvus-attu
+    depends_on:
+      - milvus
+    environment:
+      - MILVUS_URL=milvus:19530
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+networks:
+  default:
+    name: milvus-network

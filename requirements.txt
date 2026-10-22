@@ -1,0 +1,43 @@
+# RAG-Ultra 运行时依赖（未锁版本；生产建议按部署环境锁定）
+# 安装：pip install -r requirements.txt
+
+# --- Web / 接入 ---
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+loguru
+
+# --- 存储 ---
+sqlalchemy[asyncio]
+aiomysql
+greenlet
+redis
+pymilvus
+milvus-model
+minio
+
+# --- FAQ 模糊匹配（BM25：jieba 分词 + rank_bm25；缺失则退化为仅精确匹配）---
+jieba
+rank_bm25
+
+# --- 本地基础设施 MCP Server（开发环境随 main_dev 一并启动）---
+fastmcp
+
+# --- LLM / 生成 ---
+langchain-core
+langchain-openai
+
+# --- 服务发现 / 配置中心 ---
+# 必须 >=2：服务端为 Nacos 3.x，用的是 2.0+ 的 `from v2.nacos import ...`（全异步 API）。
+# 1.x 的 `import nacos` + NacosClient 走 v1 注册接口，Nacos 3.x 已移除（返回 501）。
+nacos-sdk-python>=2
+
+# --- 流式响应（SSE，/qa 与 /retrieve）与文件上传（multipart，批量上传）---
+sse-starlette
+python-multipart
+
+# --- 模型推理依赖（向量/重排/意图分类需要；按部署环境选 CPU/GPU）---
+# 例：pip install torch --index-url https://download.pytorch.org/whl/cpu
+# torch
+# transformers
