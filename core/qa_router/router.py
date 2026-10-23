@@ -1,5 +1,5 @@
 """
-router - 问答路由编排（M9）
+router - 问答路由编排
 
 顺序：答案缓存（先行，命中即返回）→ 意图识别 → FAQ 命中（精确/BM25 相似匹配则直接取标准答案）
 → 意图分流 + 检索增强 + 生成。
@@ -11,11 +11,10 @@ FAQ 命中时不调用大模型，未命中再走 RAG。FAQ 匹配见 store.faq_
 
 检索条数由 config.RECALL_K（召回候选）/ config.RERANK_TOP_K（精排保留）统一控制，不按请求传 top_k。
 
-预留占位能力（尚未实现，仅打通调用点，用 TODO 标记）：
-  - 上下文压缩（TODO）：检索片段超长时压缩后再生成
-  - 回答打分（TODO）：用户对回答打分并持久化
-  - 会话记录持久化（TODO）
-  - LLM 结果审计（TODO）
+预留占位能力（调用点已打通，逻辑待落地，详见 docs/ 下对应设计方案）：
+  - 上下文压缩（待设计，见 docs/上下文压缩设计方案.md）：检索片段超长时压缩后再生成
+  - 会话记录持久化（待设计，见 docs/会话记录持久化设计方案.md）
+  - LLM 结果审计（后续接入 RAGAS 评测管道，不在业务库持久化）：审计/质量评估交由 RAGAS
 （答案缓存前置已落地，不在此列。）
 """
 from typing import Any
@@ -89,12 +88,12 @@ class QARouter:
             if not rag_hits:
                 return {'answer': '抱歉，未找到答案！', 'source': 'empty', 'chunks': [], 'session_id': session_id, 'intent': intent}
 
-        # 4) TODO: 上下文压缩占位 - 检索片段超长时压缩后再送生成（未实现，当前原样返回）
+        # 4) 上下文压缩占位（设计方案见 docs/上下文压缩设计方案.md；当前原样返回，未实现）
         rag_hits = await self._compress_context(query, rag_hits, session_id)
 
         # 5) 大模型生成
         answer = await self.generator.generate(query=query, chunks=rag_hits, session_id=session_id, user_id=user_id)
-        # 6) TODO: 审计 + 会话记录持久化占位（未实现，当前跳过）
+        # 6) 审计（后续接入 RAGAS 评测管道）+ 会话记录持久化占位（设计方案见 docs/会话记录持久化设计方案.md）；当前跳过
         await self._audit_llm_result(query, answer, rag_hits, None, user_id)
         await self._persist_session(query, answer, session_id, intent, user_id)
         await set_answer(tenant_id, query, answer)
@@ -197,14 +196,14 @@ class QARouter:
         self, query: str, chunks: list[RetrievedChunk], session_id: str | None
     ) -> list[RetrievedChunk]:
         """上下文压缩占位：检索片段累计超长时，裁剪/压缩后再送生成。待实现。"""
-        # TODO: 依据 query 相关性或总长度阈值，对 chunks 做截断/摘要压缩
+        # TODO: 依据 query 相关性或总长度阈值，对 chunks 做截断/摘要压缩（设计方案见 docs/上下文压缩设计方案.md）
         return chunks
 
     async def _persist_session(
         self, query: str, answer: str, session_id: str | None, intent: str, user_id: str | None = None
     ) -> None:
         """会话记录持久化占位：把用户问题/回答写入会话存储（MySQL/Redis）。待实现。"""
-        # TODO: 落库会话明细，关联 tenant_id / user_id / session_id / intent
+        # TODO: 落库会话明细，关联 tenant_id / user_id / session_id / intent（设计方案见 docs/会话记录持久化设计方案.md）
         logger.debug(f'会话记录持久化未实现，跳过 [session={session_id}, user={user_id}]')
 
     async def _audit_llm_result(
@@ -215,14 +214,3 @@ class QARouter:
         # 后续由 RAGAS 评测框架落地：question/answer/context/strategy 作为评测信号采集，
         # 不在此做业务库写入（保留 no-op，避免无依赖时阻断主链路）。
         logger.debug(f'LLM 结果审计交由 RAGAS 评测管道，跳过 [strategy={strategy}, user={user_id}]')
-
-    async def record_rating(
-        self, session_id: str | None, rating: int, comment: str = ''
-    ) -> None:
-        """回答打分占位：用户打分作为 RAGAS 评测信号，后续由评测管道采集，不走业务库持久化。
-
-        由接入层在用户提交打分时调用。
-        """
-        # 后续由 RAGAS 评测框架落地：rating/comment 作为评测反馈信号，
-        # 不在此做业务库写入（保留 no-op，避免无依赖时阻断主链路）。
-        logger.debug(f'回答打分交由 RAGAS 评测管道，跳过 [session={session_id}, rating={rating}]')

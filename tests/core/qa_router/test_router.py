@@ -106,13 +106,6 @@ def test_cache_hit_shortcuts_pipeline():
     asyncio.run(_run())
 
 
-def test_record_rating_is_noop_placeholder():
-    async def _run():
-        router, *_ = _make_router()
-        await router.record_rating("s1", 5, "good")  # 占位实现不应抛错
-    asyncio.run(_run())
-
-
 class _StreamGen:
     """提供 astream 异步生成器的假生成器（RAG 流式路径）。"""
 

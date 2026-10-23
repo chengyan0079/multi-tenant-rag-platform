@@ -1,5 +1,5 @@
 """
-milvus_store - 向量存储（M3）
+milvus_store - 向量存储
 
 集合字段：chunk_id(主键) / tenant_id(分区键) / scope / doc_id / ref_id /
 dense(1024 维, 内积 IP + L2 归一化 == 余弦) / sparse(倒排, 内积)。

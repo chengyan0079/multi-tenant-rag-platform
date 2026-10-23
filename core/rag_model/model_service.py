@@ -1,5 +1,5 @@
 """
-model_service - 模型服务（M5）
+model_service - 模型服务
 
 封装 bge-m3（一次推理同时产出 dense 与 sparse 向量）和 bge-reranker-v2-m3（重排）。
 加载被拆为 load_embedding() / load_reranker() 两个独立步骤，便于 ModelManager 按

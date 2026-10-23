@@ -1,5 +1,5 @@
 """
-generator - 生成层（M8）
+generator - 生成层
 
 把检索结果拼成上下文，交给 LangChain 组装成调用大模型的链。
 大模型走平台 LLM 网关（OpenAI 兼容接口）。支持多轮历史拼接。

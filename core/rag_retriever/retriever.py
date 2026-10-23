@@ -1,5 +1,5 @@
 """
-retriever - 检索编排（M4）
+retriever - 检索编排
 
 实现"父子块去重 + 高亮"，封装为设计文档 §6.3 的 Retriever。
 支持 scope(doc/faq)、RRF 融合、Rerank 重排；Rerank 失败时退回只用 RRF 的结果。

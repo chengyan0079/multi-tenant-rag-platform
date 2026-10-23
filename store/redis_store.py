@@ -1,5 +1,5 @@
 """
-redis_store - Redis 缓存（答案缓存 / 向量 embedding 缓存 / 限流令牌桶）（M3）
+redis_store - Redis 缓存（答案缓存 / 向量 embedding 缓存 / 限流令牌桶）
 
 所有 key 强制加 t:{tenant_id}: 前缀（前缀与 TTL 统一由 store.redis_keys 管理），确保多租户隔离。
 """

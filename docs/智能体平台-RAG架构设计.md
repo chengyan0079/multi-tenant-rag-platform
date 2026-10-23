@@ -115,7 +115,7 @@
 
 ---
 
-## 3. 数据存储设计（M3）
+## 3. 数据存储设计
 
 ### 3.1 存储分工
 
@@ -309,7 +309,7 @@ class ConversationStore:
 
 ---
 
-## 7. 模型服务（M5）
+## 7. 模型服务
 
 | 用途 | 模型 | 说明 |
 |---|---|---|
@@ -335,7 +335,7 @@ class ConversationStore:
 
 ---
 
-## 9. FAQ 问答层（M9）
+## 9. FAQ 问答层
 
 ### 9.1 为什么需要 FAQ 层
 
@@ -499,9 +499,9 @@ server.run()
 
 ---
 
-## 12. 生成层：LangChain 组装检索结果 → LLM（M8）
+## 12. 生成层：LangChain 组装检索结果 → LLM
 
-检索（M4）只产 `RetrievedChunk`；**最终生成交给 LangChain**，底层 LLM 走平台网关。
+检索只产 `RetrievedChunk`；**最终生成交给 LangChain**，底层 LLM 走平台网关。
 
 ```python
 def to_documents(chunks):
@@ -529,7 +529,7 @@ async def generate(question, chunks, history=None):
 
 ---
 
-## 13. 管理控制台页面（M7）
+## 13. 管理控制台页面
 
 后端 admin API（FastAPI，`role=admin`，租户隔离）+ 前端页。
 
