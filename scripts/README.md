@@ -4,26 +4,20 @@
 
 | 文件 | 用途 |
 |---|---|
-| `gen_schema.py` | 依据 `store/orm_models` 生成 `schema.sql`（模型变更后重跑以同步） |
-| `gen_schema_pg.py` | 依据 `store/orm_models` 生成 `schema_postgresql.sql`（PostgreSQL 建表脚本） |
+| `gen_schema_pg.py` | 依据 `store/orm_models` 生成 `schema_postgresql.sql`（PostgreSQL 建表脚本，模型变更后重跑以同步） |
 | `gen_auth_headers.py` | 生成调用方签名头（自测/联调用，扮演网关角色；见 `core/auth`） |
-| `schema.sql` | MySQL 建表基准（由 `gen_schema.py` 自动生成，请勿手改） |
-| `schema_postgresql.sql` | PostgreSQL 建表脚本（由 `gen_schema_pg.py` 自动生成，请勿手改） |
+| `schema_postgresql.sql` | PostgreSQL 建表基准（由 `gen_schema_pg.py` 自动生成，请勿手改） |
 
 > Milvus 的数据库与向量集合由**服务启动时自动创建**（`app/managers/milvus_manager.py`：缺失则建、有则加载，幂等），无需单独的初始化脚本。
 
 ## 使用
 
 ```bash
-# 建表（库名与 .env 的 MYSQL_DATABASE 对齐，默认 rag）
-mysql -h127.0.0.1 -uroot -proot rag < scripts/schema.sql
-
-# PostgreSQL：先建库，再执行建表脚本
+# 建表（库名与 .env 的 POSTGRES_DATABASE 对齐）
 createdb -h127.0.0.1 -U postgres rag_ultra
 psql -h127.0.0.1 -U postgres -d rag_ultra -f scripts/schema_postgresql.sql
 
-# 改了 ORM 模型后，重新生成建表脚本（两份都要跑，避免与模型漂移）
-python scripts/gen_schema.py
+# 改了 ORM 模型后，重新生成建表脚本
 python scripts/gen_schema_pg.py
 
 # 生成调用方签名头（自测：开启 AUTH_HMAC_ENABLED 后用这些头请求接口）

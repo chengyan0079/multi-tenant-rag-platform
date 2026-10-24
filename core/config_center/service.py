@@ -3,7 +3,7 @@ service - 配置中心审批流服务（ConfigChangeService）
 
 职责：申请 / 复核 / 回滚 / 列表查询。所有 Nacos 写操作仅在审批通过后由本服务触发，
 并携带 casMd5 做乐观锁（见 docs/配置中心对接设计.md §6.1）。
-纯 MySQL 增删改查已抽离到 core.config_center.config_store（ConfigStore），本服务只做业务编排。
+纯数据库增删改查已抽离到 core.config_center.config_store（ConfigStore），本服务只做业务编排。
 
 并发控制（配置中心为管理员低频操作，无高并发）：
 - 悲观锁：复核时对申请单行加 `FOR UPDATE`，保证状态只迁移一次。
@@ -310,7 +310,7 @@ async def list_requests(
     page: int = 1,
     page_size: int = 20,
 ) -> tuple[list[ConfigChangeRequest], int]:
-    """申请列表（查询 MySQL，系统级无 tenant）。"""
+    """申请列表（查询数据库，系统级无 tenant）。"""
     return await _store.list_requests(
         session, status=status, domain=domain, applicant=applicant, page=page, page_size=page_size)
 

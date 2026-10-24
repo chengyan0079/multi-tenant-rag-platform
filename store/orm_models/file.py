@@ -37,7 +37,7 @@ class File(Base):
 
     __table_args__ = (
         UniqueConstraint('tenant_id', 'base_key', name='uk_tenant_base'),
-        Index('idx_tenant_status', 'tenant_id', 'status', 'updated_at'),
+        Index('idx_file_tenant_status', 'tenant_id', 'status', 'updated_at'),
     )
 
 

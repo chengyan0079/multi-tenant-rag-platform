@@ -1,12 +1,11 @@
-"""会话注册表 ORM 模型（MySQL 持久化，对应 schema.sql 的 rag_session 表）。
+"""会话注册表 ORM 模型（PostgreSQL 持久化，对应 schema_postgresql.sql 的 rag_session 表）。
 
 只按 user_id 隔离（user_id 由网关 OAuth 全局唯一下发，跨租户不重复），不挂 tenant_id；
 对话原文仍存 Redis（热路径）。见 docs/访问模型与会话架构决策.md §2.2。
 """
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, Index, Integer, String, UniqueConstraint
-from sqlalchemy.dialects.mysql import MEDIUMTEXT
+from sqlalchemy import BigInteger, DateTime, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from store.orm_models.base import Base
@@ -47,12 +46,12 @@ class RagTurn(Base):
     session_id: Mapped[str] = mapped_column(String(64), nullable=False, comment='会话ID')
     tenant_id: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0, comment='租户ID（仅统计）')
     role: Mapped[str] = mapped_column(String(16), nullable=False, comment='消息角色：user|assistant')
-    content: Mapped[str] = mapped_column(MEDIUMTEXT, nullable=False, comment='消息正文')
+    content: Mapped[str] = mapped_column(Text, nullable=False, comment='消息正文')
     intent: Mapped[str | None] = mapped_column(String(32), nullable=True, comment='意图：通用知识|专业咨询')
     source: Mapped[str | None] = mapped_column(String(16), nullable=True, comment='产出来源：cache|faq|rag|empty')
     strategy: Mapped[str | None] = mapped_column(String(32), nullable=True, comment='检索策略')
     model: Mapped[str | None] = mapped_column(String(64), nullable=True, comment='生成模型')
-    chunks_json: Mapped[str | None] = mapped_column(MEDIUMTEXT, nullable=True, comment='召回片段引用 JSON')
+    chunks_json: Mapped[str | None] = mapped_column(Text, nullable=True, comment='召回片段引用 JSON')
     prompt_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True, comment='提示词 token')
     completion_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True, comment='生成 token')
     latency_ms: Mapped[int | None] = mapped_column(Integer, nullable=True, comment='端到端耗时')

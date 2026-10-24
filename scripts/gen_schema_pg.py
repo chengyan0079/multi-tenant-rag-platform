@@ -3,11 +3,11 @@
 用法：python scripts/gen_schema_pg.py
 模型变更后重新运行本脚本即可同步（该文件由脚本生成，请勿手改）。
 
-与 MySQL 版（gen_schema.py）的差异来自 PG 的语法限制：
+与 MySQL 版（已废弃）的差异来自 PG 的语法限制：
   - PG 没有行内 COMMENT 语法，表/列注释改用 COMMENT ON 语句；
   - PG 没有 MEDIUMTEXT，映射为 TEXT（PG 的 TEXT 本身无长度上限）；
   - 自增主键由 BIGINT AUTO_INCREMENT 变为 BIGSERIAL。
-分区与表顺序复用 gen_schema.py 的 SECTIONS，避免两份脚本漂移。
+分区与表顺序由下方 SECTIONS 决定，是生成脚本的唯一事实来源。
 """
 import sys
 from pathlib import Path
@@ -15,8 +15,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-if str(Path(__file__).resolve().parent) not in sys.path:
-    sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from sqlalchemy import Table
 from sqlalchemy.dialects import postgresql
@@ -27,8 +25,6 @@ from sqlalchemy.schema import CreateIndex, CreateTable
 import store.orm_models  # noqa: F401  触发所有模型注册到 Base.metadata
 from store.orm_models import Base
 
-from gen_schema import SECTIONS
-
 _DIALECT = postgresql.dialect()
 
 
@@ -37,6 +33,29 @@ def _compile_mediumtext(type_, compiler, **kw):
     """PG 没有 MEDIUMTEXT，落到 TEXT。"""
     return 'TEXT'
 
+
+# (分区标题, [(表名, 表注释), ...]) —— 同时决定输出顺序
+SECTIONS = [
+    ("1) 租户级业务表（均带 tenant_id 做租户隔离）", [
+        ("rag_document", "文档解析/索引记录（点击解析时创建，经 file_upload_id 引用上传记录，不重复文件元数据）"),
+        ("rag_chunk", "切片（文档/FAQ 切分后的最小检索单元；scope 区分 doc/faq）"),
+        ("rag_index_task", "索引任务（文档解析/嵌入入库的异步任务）"),
+        ("rag_faq", "每租户高频问题表（PostgreSQL+Redis 字面匹配；question_type 为意图训练数据源）"),
+        ("rag_file", "文档/文件列表（一个 base_key 一行，冗余当前版本；版本历史见 rag_file_version）"),
+        ("rag_file_version", "文件版本历史（一个版本一行；同文档同内容唯一，幂等去重）"),
+    ]),
+    ("2) 用户级表（按 user_id 隔离；rag_turn 另带 tenant_id 仅统计用）", [
+        ("rag_session", "会话注册表（列表/元数据持久化；对话原文存 Redis）"),
+        ("rag_turn", "问答明细（一轮两条：user/assistant；与 Redis 会话原文 1:1）"),
+    ]),
+    ("3) 系统级表（无 tenant_id；配置审批流，复用 Nacos）", [
+        ("rag_config_change_request", "配置变更申请"),
+        ("rag_config_review", "配置复核记录"),
+    ]),
+    ("4) 系统级日志表（无 tenant_id；API 调用审计）", [
+        ("rag_api_call_log", "API 调用日志（一条请求一行：请求侧 + 响应侧 + 耗时）"),
+    ]),
+]
 
 HEADER = """-- ============================================================
 -- RAG-Ultra 问答系统 元数据表（PostgreSQL 14+）
@@ -50,14 +69,14 @@ HEADER = """-- ============================================================
 --     rag_document 为“解析/索引”记录，经 file_upload_id 引用上传版本，不重复文件元数据。
 -- 说明：列默认值由 ORM 在写入时提供（Python 侧 default），故 DDL 不含服务器端 DEFAULT。
 --
--- 与 MySQL 版（schema.sql）的语法差异：
+-- 与 MySQL 版的语法差异（MySQL 版已废弃）：
 --   - 注释用 COMMENT ON（PG 无行内 COMMENT 语法）；
 --   - MEDIUMTEXT -> TEXT；
 --   - 自增主键 BIGINT AUTO_INCREMENT -> BIGSERIAL；
 --   - JSON 列编译为 JSON；若需要 JSONB（支持索引/GIN），可自行替换类型。
 -- ============================================================
 
--- 建库（库名与 .env 的 MYSQL_DATABASE 对齐即可；已有库或库名不同则跳过本句）
+-- 建库（库名与 .env 的 POSTGRES_DATABASE 对齐即可；已有库或库名不同则跳过本句）
 CREATE DATABASE rag_ultra ENCODING 'UTF8';
 
 -- psql 下切到该库后执行建表：\\connect rag_ultra

@@ -1,4 +1,4 @@
-"""文档（索引）DAO（store 数据访问层）：rag_document / rag_chunk 的 MySQL 操作。
+"""文档（索引）DAO（store 数据访问层）：rag_document / rag_chunk 的 PostgreSQL 操作。
 
 文档解析流程：POST /admin/docs 落 rag_document(status=0) → 投递索引任务 →
 IndexManager 消费后由 core.rag_indexer.pipeline 完成切分 + 向量化，并把切片写 rag_chunk、
@@ -9,7 +9,7 @@ IndexManager 消费后由 core.rag_indexer.pipeline 完成切分 + 向量化，�
 from sqlalchemy import delete, select
 
 from app.app_state import app_state
-from store.mysql_store import get_sessionmaker
+from store.postgres_store import get_sessionmaker
 from store.orm_models.file import File
 from store.orm_models.knowledge import Chunk, Doc
 

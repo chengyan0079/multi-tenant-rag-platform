@@ -29,7 +29,7 @@ def _to_item(row) -> FaqItem:
 
 @router.post("/faq", response_model=ApiResponse[FaqCreateResult], summary="新建 FAQ")
 async def create_faq(req: FaqRequest, tenant_id: int = Depends(resolve_tenant)):
-    """新建 FAQ（落 MySQL + 写穿透刷新 Redis 缓存）。"""
+    """新建 FAQ（落数据库 + 写穿透刷新 Redis 缓存）。"""
     faq_id = await FaqDao().create(
         tenant_id, req.question, req.answer, req.question_type, req.similar_questions)
     return success(FaqCreateResult(faq_id=faq_id, tenant_id=tenant_id, status="created"))

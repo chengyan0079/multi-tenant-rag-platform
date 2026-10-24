@@ -269,7 +269,7 @@ def test_health_dao(monkeypatch):
     async def _redis():
         return True
 
-    async def _mysql():
+    async def _pg():
         return False
 
     class _Milvus:
@@ -277,13 +277,13 @@ def test_health_dao(monkeypatch):
             return True
 
     monkeypatch.setattr(health_dao_module, "redis_ping", _redis)
-    monkeypatch.setattr(health_dao_module, "mysql_ping", _mysql)
+    monkeypatch.setattr(health_dao_module, "db_ping", _pg)
     class _Store:
         client = _Milvus()
     monkeypatch.setattr(app_state, "milvus_store", _Store())
     monkeypatch.setattr(app_state, "model_service", object())
     d = asyncio.run(HealthDao().check())
-    assert d["redis"] is True and d["mysql"] is False and d["milvus"] is True and d["model"] is True
+    assert d["redis"] is True and d["postgres"] is False and d["milvus"] is True and d["model"] is True
     monkeypatch.setattr(app_state, "milvus_store", None)
     assert asyncio.run(HealthDao().check())["milvus"] is False
 
@@ -296,7 +296,7 @@ def test_health_dao_extra_components(monkeypatch):
         return False
 
     monkeypatch.setattr(health_dao_module, "redis_ping", _no)
-    monkeypatch.setattr(health_dao_module, "mysql_ping", _no)
+    monkeypatch.setattr(health_dao_module, "db_ping", _no)
     monkeypatch.setattr(app_state, "milvus_store", None)
     monkeypatch.setattr(app_state, "model_service", None)
 

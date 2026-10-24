@@ -1,7 +1,7 @@
 """
 test_router - 问答路由单测（pytest + mock）
 
-mock 掉 classify_query、Redis 缓存、MySQL FAQ 查询，以及注入假的 retriever/generator/
+mock 掉 classify_query、Redis 缓存、PostgreSQL FAQ 查询，以及注入假的 retriever/generator/
 strategy_selector/augmenter，验证"意图分流 + 检索增强"主流程。
 用 asyncio.run 包裹异步逻辑，避免依赖 pytest-asyncio 插件。
 """
@@ -16,9 +16,9 @@ from unittest import mock
 
 from common.config import config
 
-# MySQL 层依赖 sqlalchemy[asyncio]/greenlet，测试环境可能缺失；此处以 mock 注入，
-# 使 router 模块可导入（MySQL 交互在单测中本就被 mock 掉，不实际触达）。
-sys.modules.setdefault("store.mysql_store", mock.MagicMock())
+# 数据库层依赖 sqlalchemy[asyncio]/greenlet，测试环境可能缺失；此处以 mock 注入，
+# 使 router 模块可导入（数据库交互在单测中本就被 mock 掉，不实际触达）。
+sys.modules.setdefault("store.postgres_store", mock.MagicMock())
 
 import core.qa_router.router as m
 from core.qa_router.compression import CompressResult
@@ -197,7 +197,7 @@ def test_persist_failure_does_not_break_answer():
                  mock.patch.object(router, "_audit_llm_result", new=mock.AsyncMock()), \
                  mock.patch.object(config, "QA_PERSIST_ASYNC", False), \
                  mock.patch.object(router.session_store, "persist_turn_rows",
-                                   new=mock.AsyncMock(side_effect=RuntimeError("MySQL 挂了"))):
+                                   new=mock.AsyncMock(side_effect=RuntimeError("数据库 挂了"))):
                 res = await router.answer("问题", tenant_id=1, session_id="s1", user_id="u1")
         assert res["source"] == "rag" and res["answer"] == "答案"
     asyncio.run(_run())

@@ -1,7 +1,7 @@
-"""会话存储（store 数据访问层）：Redis 对话原文/元数据 + MySQL 注册表（rag_session）。
+"""会话存储（store 数据访问层）：Redis 对话原文/元数据 + PostgreSQL 注册表（rag_session）。
 
 - 对话原文：Redis LIST，TTL=30d
-- 注册表：MySQL rag_session（标题/预览/轮数/时间），保证列表可长期回看
+- 注册表：PostgreSQL rag_session（标题/预览/轮数/时间），保证列表可长期回看
 隔离维度 (user_id, session_id)，跨用户不可见（user_id 由网关全局唯一下发）。
 SessionView 为注册表轻量读投影（存储型 DTO），与 store 同层定义，避免 store→core 反向依赖。
 """
@@ -15,7 +15,7 @@ from common.config import config
 from common.logger import logger
 from app.app_state import app_state
 from store.redis_keys import KeyPrefix, build_key
-from store.mysql_store import get_session
+from store.postgres_store import get_session
 
 
 def _chunk_field(chunk: Any, name: str, default: Any = None) -> Any:
@@ -76,7 +76,7 @@ class SessionStore:
 
     # ---- 本轮问答明细（turn）结构：集中定义，避免各调用处各拼一份 ----
     def new_turn_id(self) -> str:
-        """一轮问答一个 ID（同轮 user/assistant 两条共享），用于 Redis 元素与 MySQL 行对账。"""
+        """一轮问答一个 ID（同轮 user/assistant 两条共享），用于 Redis 元素与数据库行对账。"""
         return uuid.uuid4().hex
 
     def build_turn_payload(
@@ -100,7 +100,7 @@ class SessionStore:
         compress_dropped: int | None = None,
         eval_flag: int = 0,
     ) -> tuple[dict[str, Any], dict[str, Any], list[dict[str, Any]]]:
-        """构造一轮问答的持久化数据，返回 (user 元素, assistant 元素, MySQL 行列表)。
+        """构造一轮问答的持久化数据，返回 (user 元素, assistant 元素, 数据库行列表)。
 
         QA 明细（检索/模型/耗时/压缩）只挂在 assistant 侧——它们是产出侧属性；
         user 元素保持轻量，也兼容历史数据里没有这些字段的元素。
@@ -237,9 +237,9 @@ class SessionStore:
         except Exception as e:
             logger.warning(f'删除会话 Redis 失败: {e}')
 
-    # ---- MySQL：会话注册表（rag_session） ----
+    # ---- PostgreSQL：会话注册表（rag_session） ----
     async def persist_turn_rows(self, rows: list[dict[str, Any]]) -> None:
-        """问答明细落 MySQL（一轮两条），唯一键冲突视为成功——重试/重放时幂等。"""
+        """问答明细落数据库（一轮两条），唯一键冲突视为成功——重试/重放时幂等。"""
         if not rows:
             return
         from sqlalchemy.exc import IntegrityError

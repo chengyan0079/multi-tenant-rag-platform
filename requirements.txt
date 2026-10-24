@@ -10,7 +10,7 @@ loguru
 
 # --- 存储 ---
 sqlalchemy[asyncio]
-aiomysql
+asyncpg
 greenlet
 redis
 pymilvus

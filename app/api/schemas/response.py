@@ -182,7 +182,7 @@ class RetrieveData(BaseModel):
 class HealthData(BaseModel):
     status: str = Field(..., description="总体状态")
     redis: bool = Field(..., description="Redis 是否可达")
-    mysql: bool = Field(..., description="MySQL 是否可达")
+    postgres: bool = Field(..., description="PostgreSQL 是否可达")
     milvus: bool = Field(..., description="Milvus 集合是否就绪")
     model: bool = Field(..., description="模型是否就绪")
     mcp: bool = Field(..., description="MCP API 服务是否就绪（未启用为 False）")

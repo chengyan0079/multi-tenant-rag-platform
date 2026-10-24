@@ -1,4 +1,4 @@
-"""文件 / 文档 DAO（store 数据访问层）：rag_file + rag_file_version 的 MySQL 操作 + 对象存储读写。
+"""文件 / 文档 DAO（store 数据访问层）：rag_file + rag_file_version 的 PostgreSQL 操作 + 对象存储读写。
 
 封装上传幂等编排（get-or-create 文档 → 内容去重 → 分配版本 → 存对象 → 写版本 → 更新当前指针）。
 返回 ORM 实体 / provider 的 FileRef / 简单 DTO（UploadOutcome）；实体 → 响应模型的映射在路由层完成，
@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from app.app_state import app_state
-from store.mysql_store import get_sessionmaker
+from store.postgres_store import get_sessionmaker
 from store.orm_models.file import File, FileVersion
 
 

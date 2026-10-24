@@ -76,7 +76,7 @@ async def update_session(session_id: str, req: SessionPatch, uid: str = Depends(
 
 @router.delete("/sessions/{session_id}", response_model=ApiResponse[OkData], summary="删除会话")
 async def delete_session(session_id: str, uid: str = Depends(_require_user)):
-    """删除会话：清 Redis 原文/记忆 + MySQL 注册表。"""
+    """删除会话：清 Redis 原文/记忆 + PostgreSQL 注册表。"""
     await SessionService().delete(uid, session_id)
     return success(OkData())
 

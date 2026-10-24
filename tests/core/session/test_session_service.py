@@ -1,13 +1,13 @@
 """SessionService 单测：编排逻辑（标题生成、轮数计数、压缩触发、删除）。
 
-用 FakeStore / FakeMemory 注入，不触达 Redis / MySQL / LLM。
+用 FakeStore / FakeMemory 注入，不触达 Redis / 数据库 / LLM。
 """
 import sys
 from unittest import mock
 
-# 本环境缺 greenlet，sqlalchemy.ext.asyncio 无法 import；store.mysql_store 被
+# 本环境缺 greenlet，sqlalchemy.ext.asyncio 无法 import；store.postgres_store 被
 # SessionStore 顶层导入，这里用 MagicMock 替换以避免 import 失败（本测试不触达真实注册表）。
-sys.modules.setdefault("store.mysql_store", mock.MagicMock())
+sys.modules.setdefault("store.postgres_store", mock.MagicMock())
 
 import asyncio
 

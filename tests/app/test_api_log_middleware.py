@@ -1,6 +1,6 @@
 """ApiLogMiddleware 单测：请求/响应分条日志、请求体捕获后下游仍可读、排除路径、敏感头脱敏。
 
-用 TestClient + 假 logger 收集日志，不依赖 MySQL（单测关闭落库）。
+用 TestClient + 假 logger 收集日志，不依赖数据库（单测关闭落库）。
 """
 from fastapi import FastAPI
 from fastapi.testclient import TestClient

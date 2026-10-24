@@ -1,7 +1,7 @@
 """
 test_faq_cache - FAQ 字面精确匹配纯逻辑单测（pytest + mock）
 
-仅测试不依赖 Redis/MySQL 的纯函数：match_faq / _parse_similar / _normalize / _tokenize / bm25_match。
+仅测试不依赖 Redis/数据库的纯函数：match_faq / _parse_similar / _normalize / _tokenize / bm25_match。
 用 asyncio.run 包裹（本模块无异步纯函数，仅保持与项目单测约定一致）。
 """
 import asyncio

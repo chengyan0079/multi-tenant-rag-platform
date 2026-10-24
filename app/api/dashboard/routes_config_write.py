@@ -14,7 +14,7 @@ from app.api.schemas import (
 from common.response import ApiResponse, success
 from core.config_center import service
 from store.orm_models.config import ConfigChangeRequest
-from store.mysql_store import get_session
+from store.postgres_store import get_session
 
 router = APIRouter(
     prefix="/admin/config",

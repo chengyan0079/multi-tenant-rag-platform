@@ -1,14 +1,14 @@
 """
-faq_cache - FAQ 高频问题缓存（MySQL 源 + Redis 缓存，字面精确匹配）
+faq_cache - FAQ 高频问题缓存（数据库源 + Redis 缓存，字面精确匹配）
 
-设计（与 rag-pro 一致，MySQL+Redis，不用 Milvus）：
-- 源数据在 rag_faq（MySQL），按 tenant_id 隔离。
+设计（与 rag-pro 一致，PostgreSQL+Redis，不用 Milvus）：
+- 源数据在 rag_faq（数据库），按 tenant_id 隔离。
 - 启动时全量载入 Redis：每条 faq:{id} 存完整记录，每个租户一份候选列表
   faq:tenant:{tid}:items（仅含匹配所需字段）。
 - 查询时做归一化后的精确匹配：先比 question，再比 similar_questions 各条；
   命中即返回标准答案，避免误触发（不调用大模型）。
-- 增删改走写穿透：改动后重载该租户缓存，保证 Redis 与 MySQL 一致。
-- 冷启动兜底：Redis 中某租户未载入时，回源 MySQL 查询该租户（小集合）。
+- 增删改走写穿透：改动后重载该租户缓存，保证 Redis 与数据库一致。
+- 冷启动兜底：Redis 中某租户未载入时，回源数据库查询该租户（小集合）。
 """
 from typing import Any, Optional, Tuple
 
@@ -17,7 +17,7 @@ from sqlalchemy import select
 from app.app_state import app_state
 from common.config import config
 from common.logger import logger
-from store.mysql_store import get_sessionmaker
+from store.postgres_store import get_sessionmaker
 from store.orm_models.faq import Faq
 
 
@@ -135,7 +135,7 @@ def bm25_match(items: list[dict], query: str, threshold: float, tenant_id: int) 
 # ----------------------------- Redis 读写 -----------------------------
 
 async def _reload_tenant(tenant_id: int) -> None:
-    """从 MySQL 重载某租户的 FAQ 缓存（单条记录 + 候选列表）。"""
+    """从数据库重载某租户的 FAQ 缓存（单条记录 + 候选列表）。"""
     r = app_state.redis
     if r is None:
         return
@@ -192,7 +192,7 @@ async def get_faq_answer(tenant_id: int, query: str) -> Tuple[Optional[str], Opt
                 items = _json_loads(raw)
             except Exception:
                 items = None
-        # Redis 中该租户未载入（冷启动）：回源 MySQL 兜底
+        # Redis 中该租户未载入（冷启动）：回源数据库兜底
         if items is None:
             items = await _match_from_db(tenant_id)
 

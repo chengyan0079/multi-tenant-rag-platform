@@ -13,7 +13,7 @@
 |---|---|
 | 模型 | **bge-m3**（dense 1024 + sparse，一次推理同时产出）、**bge-reranker-v2-m3**（精排）、**google-bert**（可选：兜底 embedding / 多轮 query 改写） |
 | 向量库 | **Milvus**（dense + sparse 同集合；sparse 用 **IP 内积** 度量） |
-| 元数据 | **MySQL 8** |
+| 元数据 | **PostgreSQL 8** |
 | 缓存/队列 | **Redis**（会话 / 答案缓存 / 热点 / 队列 / 限流） |
 | 源文件 | 实际在 **OSS**，当前无 OSS 服务；本地有 **MinIO**（可用性待定） |
 | 接口 | **FastAPI** + **Swagger**；支持多租户、文档隔离 |
@@ -41,7 +41,7 @@
 
 - 构建 **问答系统**：**FAQ 优先**（高频标准问题毫秒级、答案可控可审计）+ **RAG 兜底**（长尾/开放问题检索文档生成）。
 - 支持多格式文档（PDF/Word/Excel/MD/TXT）入库；源文件在 OSS，当前无 OSS 时 **Mock 文件获取/上传接口**（单/批量），兼容本地 MinIO，生产无缝切 OSS。
-- 元数据落 **MySQL 8**，向量（dense+sparse）落 **Milvus**，缓存/队列落 **Redis**；BM25 倒排不再维护。
+- 元数据落 **PostgreSQL 8**，向量（dense+sparse）落 **Milvus**，缓存/队列落 **Redis**；BM25 倒排不再维护。
 - 检索：**bge-m3 dense(cosine) + sparse(IP)** 两路混合，RRF 融合，bge-reranker-v2-m3 精排。
 - 全链路异步；支持 **多租户 / 文档级隔离**（文档与切片为租户级，无独立知识库）。
 - 支持 **多次多轮问答**（会话与历史上下文）。
@@ -90,7 +90,7 @@
 |---|---|---|---|
 | M1 | rag-api | 请求接入、租户鉴权、限流、Swagger、SSE、编排、traceid | FastAPI、Pydantic v2、slowapi |
 | M2 | rag-indexer | 文档获取、解析、清洗、分块、向量化、落库（异步 Worker） | Celery/ARQ、MinerU/PyMuPDF、bge-m3 |
-| M3 | rag-store | 多源持久化与隔离 | MySQL 8、Milvus（dense+sparse IP）、Redis |
+| M3 | rag-store | 多源持久化与隔离 | PostgreSQL 8、Milvus（dense+sparse IP）、Redis |
 | M4 | rag-retriever | 两路混合召回、RRF 融合、Rerank、上下文组装 | bge-m3、RRF、bge-reranker-v2-m3 |
 | M5 | rag-model | Embedding / Rerank 统一封装 | bge-m3、bge-reranker-v2-m3、google-bert（可选兜底） |
 | M6 | rag-ops | 评测、监控、灰度、索引重建 | RAGAS、Prometheus、双集合切换 |
@@ -105,7 +105,7 @@
 | 服务框架 | FastAPI + Pydantic v2 + asyncio |
 | 配置加载 | `ConfigManager`（env + 可选 YAML，Pydantic 校验）→ `app_state.settings` |
 | 异步任务 | Celery / ARQ（Redis broker）+ 幂等状态机 |
-| 元数据 | MySQL 8（按 tenant_id 隔离） |
+| 元数据 | PostgreSQL 8（按 tenant_id 隔离） |
 | 向量库 | Milvus 2.4+（dense 1024 cosine + sparse IP，partition key 隔离） |
 | 缓存/队列/限流 | Redis |
 | 模型 | bge-m3（dense+sparse）、bge-reranker-v2-m3、google-bert（可选兜底） |
@@ -122,54 +122,54 @@
 | 数据 | 存储 | 说明 |
 |---|---|---|
 | 源文件 | OSS / MinIO / Mock | 仅存引用与下载 URL，流式解析不落本地盘 |
-| 元数据 | MySQL 8 | 租户、文档、分块、任务、FAQ、上传记录、权限 |
+| 元数据 | PostgreSQL 8 | 租户、文档、分块、任务、FAQ、上传记录、权限 |
 | 向量（dense + sparse） | Milvus | bge-m3 dense(1024, cosine) + sparse(IP)，doc 与 faq 同集合分区 |
 | 缓存/会话/队列/限流 | Redis | 答案缓存（query→answer）、多轮 history、embedding 缓存、任务队列、令牌桶 |
 
 > 原"BM25 倒排（Redis term→posting）"已移除，词法召回由 **bge-m3 sparse + Milvus IP** 承担。
 
-### 3.2 MySQL 核心表
+### 3.2 PostgreSQL 核心表
 
 ```sql
 CREATE TABLE rag_document (
   id BIGINT PRIMARY KEY, tenant_id BIGINT NOT NULL,
-  doc_type TINYINT DEFAULT 0,            -- 0=普通文档 1=FAQ 来源
-  oss_key VARCHAR(512) NOT NULL,        -- 存储路径（OSS/MinIO 对象键 或 Mock 本地相对路径），即 FileProvider 取文件 key
-  source_path VARCHAR(512),             -- 原始来源路径（溯源/按路径去重，不参与取文件）
+  doc_type SMALLINT DEFAULT 0,         -- 0=普通文档 1=FAQ 来源
+  oss_key VARCHAR(512) NOT NULL,       -- 存储路径（OSS/MinIO 对象键 或 Mock 本地相对路径），即 FileProvider 取文件 key
+  source_path VARCHAR(512),            -- 原始来源路径（溯源/按路径去重，不参与取文件）
   file_name VARCHAR(256), file_type VARCHAR(16), file_size BIGINT, file_hash VARCHAR(64),
-  status TINYINT, err_msg VARCHAR(512), created_at DATETIME, updated_at DATETIME,
-  KEY idx_tenant_status (tenant_id, status)
+  status SMALLINT, err_msg VARCHAR(512), created_at TIMESTAMP, updated_at TIMESTAMP,
+  INDEX idx_tenant_status (tenant_id, status)
 );
 
 CREATE TABLE rag_chunk (
   id BIGINT PRIMARY KEY, tenant_id BIGINT NOT NULL, doc_id BIGINT NOT NULL,
-  scope TINYINT DEFAULT 0,              -- 0=doc 1=faq
+  scope SMALLINT DEFAULT 0,             -- 0=doc 1=faq
   ref_id BIGINT DEFAULT 0,              -- scope=1 时指向 rag_faq.id
-  seq INT, content TEXT, token_count INT, meta JSON, enabled TINYINT DEFAULT 1, created_at DATETIME, updated_at DATETIME,
-  KEY idx_doc (tenant_id, doc_id)
+  seq INT, content TEXT, token_count INT, meta JSON, enabled SMALLINT DEFAULT 1, created_at TIMESTAMP, updated_at TIMESTAMP,
+  INDEX idx_doc (tenant_id, doc_id)
 );
 
 CREATE TABLE rag_index_task (
   id BIGINT PRIMARY KEY, tenant_id BIGINT NOT NULL, doc_id BIGINT,
-  stage VARCHAR(16), status TINYINT, retry_count INT DEFAULT 0, created_at DATETIME, updated_at DATETIME,
-  KEY idx_status (status, stage)
+  stage VARCHAR(16), status SMALLINT, retry_count INT DEFAULT 0, created_at TIMESTAMP, updated_at TIMESTAMP,
+  INDEX idx_status (status, stage)
 );
 
 CREATE TABLE rag_faq (
   id BIGINT PRIMARY KEY, tenant_id BIGINT NOT NULL,
   question VARCHAR(512) NOT NULL, answer TEXT NOT NULL,
   similar_questions TEXT,               -- 相似问题（多行文本，命中候选）
-  question_type TINYINT NOT NULL DEFAULT 0,  -- 0=通用知识 1=专业咨询（对齐意图分类器）
-  enabled TINYINT NOT NULL DEFAULT 1, created_at DATETIME, updated_at DATETIME,
-  KEY idx_tenant_enabled (tenant_id, enabled), KEY idx_tenant_type (tenant_id, question_type)
+  question_type SMALLINT NOT NULL DEFAULT 0,  -- 0=通用知识 1=专业咨询（对齐意图分类器）
+  enabled SMALLINT NOT NULL DEFAULT 1, created_at TIMESTAMP, updated_at TIMESTAMP,
+  INDEX idx_tenant_enabled (tenant_id, enabled), INDEX idx_tenant_type (tenant_id, question_type)
 );
 
 CREATE TABLE rag_file_upload (
   id BIGINT PRIMARY KEY, tenant_id BIGINT NOT NULL,
   base_key VARCHAR(512) NOT NULL, oss_key VARCHAR(512) NOT NULL, source_path VARCHAR(512),
   version INT NOT NULL DEFAULT 1, file_name VARCHAR(256), file_type VARCHAR(16), file_size BIGINT,
-  status TINYINT DEFAULT 1, expires_at DATETIME, created_at DATETIME, updated_at DATETIME,
-  UNIQUE KEY uk_base_ver (base_key, version), KEY idx_tenant (tenant_id)
+  status SMALLINT DEFAULT 1, expires_at TIMESTAMP, created_at TIMESTAMP, updated_at TIMESTAMP,
+  UNIQUE (base_key, version), INDEX idx_tenant (tenant_id)
 );
 ```
 
@@ -240,7 +240,7 @@ class FileProvider(ABC):
   clean  : 去页眉页脚、乱码过滤、表格转 Markdown
   chunk  : 标题感知递归分块，chunk_size≈512 token，overlap≈64；表格整块；父子分块
   embed  : bge-m3 批量编码 → dense(1024) + sparse 一次产出（batch=32~64）
-  index  : ① chunk 写 MySQL(scope=0)  ② (chunk_id,dense,sparse,scope) 写 Milvus
+  index  : ① chunk 写 PostgreSQL(scope=0)  ② (chunk_id,dense,sparse,scope) 写 Milvus
            ③ 更新 doc.status=完成
 ```
 
@@ -327,7 +327,7 @@ class ConversationStore:
 | 维度 | 实现 |
 |---|---|
 | 接入层 | 解析 `tenant_id` 写入请求上下文（FastAPI dependency），所有 DB/向量/Redis 操作强制带 `tenant_id` |
-| MySQL | 所有表带 `tenant_id`，索引加 `(tenant_id, ...)` |
+| PostgreSQL | 所有表带 `tenant_id`，索引加 `(tenant_id, ...)` |
 | Milvus | `tenant_id` partition key（或按 kb 独立 Collection） |
 | Redis | 所有 key 加 `t:{tenant_id}:` 前缀 |
 | 鉴权 | 非法跨租户在 M1 拦截，检索结果再过滤兜底 |
@@ -384,7 +384,7 @@ Query → [FAQ 层] M4(scope=1) + 阈值判定
 ```python
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="RAG_", env_file=".env", extra="ignore")
-    REDIS_URL: str; MYSQL_DSN: str; MILVUS_URI: str
+    REDIS_URL: str; POSTGRES_DSN: str; MILVUS_URI: str
     OSS_ENABLED: bool = False; MINIO_ENABLED: bool = False
     HOST: str = "0.0.0.0"; PORT: int = 8000
     FILE_TTL_HOURS: int = 24
@@ -407,9 +407,9 @@ class RedisManager:
         app_state.redis = self.pool
     async def stop(self): await self.pool.aclose()
 
-class MySQLManager:
+class PostgreSQLManager:
     async def start(self):
-        app_state.engine = create_async_engine(app_state.settings.MYSQL_DSN, pool_pre_ping=True)
+        app_state.db_engine = create_async_engine(app_state.settings.POSTGRES_DSN, pool_pre_ping=True)
         async with app_state.engine.begin() as c:
             await c.run_sync(Base.metadata.create_all)   # 生产建议 Alembic 迁移
     async def stop(self): await app_state.engine.dispose()
@@ -483,7 +483,7 @@ server = AppServer("rag")
 server.register(ConfigManager(),       0)
 server.register(LoggingManager(),      10)
 server.register(RedisManager(),        20)
-server.register(MySQLManager(),        30)
+server.register(PostgreSQLManager(),        30)
 server.register(MilvusManager(),       40)
 server.register(ModelManager(),        50)
 server.register(FileProviderManager(), 60)
@@ -549,13 +549,13 @@ async def generate(question, chunks, history=None):
 
 ## 14. 并发与多线程多进程（锁控制）
 
-运行形态：在线检索 asyncio 单循环（CPU 重活交线程池/进程池）；索引 Celery/ARQ **多 Worker（可能多进程）**；FastAPI 可 **多 uvicorn worker（gunicorn）**。原则：**共享状态必须走 Redis/MySQL，禁止进程内可变状态**；能原子操作就不加锁，必须加锁用 **Redis 分布式锁**（租约/看门狗），禁止进程内 `threading.Lock`（跨进程无效）。
+运行形态：在线检索 asyncio 单循环（CPU 重活交线程池/进程池）；索引 Celery/ARQ **多 Worker（可能多进程）**；FastAPI 可 **多 uvicorn worker（gunicorn）**。原则：**共享状态必须走 Redis/PostgreSQL，禁止进程内可变状态**；能原子操作就不加锁，必须加锁用 **Redis 分布式锁**（租约/看门狗），禁止进程内 `threading.Lock`（跨进程无效）。
 
 | 并发点 | 风险 | 控制措施 |
 |---|---|---|
 | 文件上传版本号分配 | version 竞态 | `file_upload(base_key, version)` 唯一约束兜底；按 base_key 加分布式锁后 `SELECT MAX(version)+1`；或用 Redis `INCR ver:{base_key}` 原子分配 |
 | Milvus 写入 | 同 chunk_id 并发 upsert | 按 doc_id 串行化索引任务；chunk_id 主键，幂等 upsert |
-| MySQL 状态机 | 连接竞争、状态重复推进 | 异步连接池 + 事务；`SELECT ... FOR UPDATE` 或乐观版本号 |
+| PostgreSQL 状态机 | 连接竞争、状态重复推进 | 异步连接池 + 事务；`SELECT ... FOR UPDATE` 或乐观版本号 |
 | 答案/结果缓存 | 多进程不一致 | 缓存落 Redis（非进程内存）；设合理 TTL |
 | 会话历史追加 | 多轮并发写同 session | Redis `RPUSH` 原子追加 |
 | base64 下载 | 大文件重复编码/内存膨胀 | 接口层校验 `file_size ≤ BASE64_MAX_BYTES`，超限仅返回 url；编码交线程池 |
@@ -630,7 +630,7 @@ async def generate(question, chunks, history=None):
 
 | Method | Path | 说明 |
 |---|---|---|
-| POST | `/admin/faq` | 新建/更新 FAQ（落 MySQL + 写透 Redis 缓存，字面精确匹配命中，不调大模型） |
+| POST | `/admin/faq` | 新建/更新 FAQ（落 PostgreSQL + 写透 Redis 缓存，字面精确匹配命中，不调大模型） |
 | GET | `/v1/faq/{faq_id}` | 查 FAQ 详情 |
 
 ### 17.6 控制台 / 管理（admin，role=admin + 租户隔离）
@@ -646,7 +646,7 @@ async def generate(question, chunks, history=None):
 
 | Method | Path | 说明 |
 |---|---|---|
-| GET | `/v1/health` | 健康检查（含 Milvus/MySQL/Redis/Model），供 nacos 探活 |
+| GET | `/v1/health` | 健康检查（含 Milvus/PostgreSQL/Redis/Model），供 nacos 探活 |
 
 ---
 

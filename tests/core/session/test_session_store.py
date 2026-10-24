@@ -5,9 +5,9 @@
 import sys
 from unittest import mock
 
-# 本环境缺 greenlet，sqlalchemy.ext.asyncio 无法 import；store.mysql_store 仅被
+# 本环境缺 greenlet，sqlalchemy.ext.asyncio 无法 import；store.postgres_store 仅被
 # SessionStore 顶层导入，这里用 MagicMock 替换，避免 import 失败（注册表走 mock）。
-sys.modules.setdefault("store.mysql_store", mock.MagicMock())
+sys.modules.setdefault("store.postgres_store", mock.MagicMock())
 
 import asyncio
 from typing import Any

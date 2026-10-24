@@ -1,4 +1,4 @@
-"""健康检查 DAO（store 数据访问层）：聚合 Redis / MySQL / Milvus / Model / MCP / Nacos 探活。
+"""健康检查 DAO（store 数据访问层）：聚合 Redis / PostgreSQL / Milvus / Model / MCP / Nacos 探活。
 
 返回原始探活结果（dict）；响应模型 HealthData 由路由层组装，故本模块不依赖 app.api.schemas。
 
@@ -7,7 +7,7 @@
 启动/运行时维护状态，这里只做汇总。
 """
 from app.app_state import app_state
-from store.mysql_store import ping as mysql_ping
+from store.postgres_store import ping as db_ping
 from store.redis_store import ping as redis_ping
 
 
@@ -39,7 +39,7 @@ class HealthDao:
             milvus_ok = False
         return {
             "redis": await redis_ping(),
-            "mysql": await mysql_ping(),
+            "postgres": await db_ping(),
             "milvus": bool(milvus_ok),
             "model": app_state.model_service is not None,
             "mcp": _mcp_ok(),

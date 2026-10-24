@@ -38,7 +38,7 @@ class ConfigChangeRequest(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now, comment='更新时间')
 
     __table_args__ = (
-        Index('idx_status', 'status'),
+        Index('idx_request_status', 'status'),
         Index('idx_domain', 'domain'),
         Index('idx_data', 'namespace', 'group_id', 'data_id'),
     )

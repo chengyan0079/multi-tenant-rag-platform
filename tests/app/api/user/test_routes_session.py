@@ -1,14 +1,14 @@
 """routes_session 单测：验证服务端建会话、user 级隔离、缺 user_id 拒绝。
 
-用内存假 Redis + FastAPI TestClient。MySQL 注册表（rag_session）以内存实现替代，
-避免依赖 greenlet / 真实 DB（store.mysql_store 仅被 mock 用于绕过其顶层 import）。
+用内存假 Redis + FastAPI TestClient。PostgreSQL 注册表（rag_session）以内存实现替代，
+避免依赖 greenlet / 真实 DB（store.postgres_store 仅被 mock 用于绕过其顶层 import）。
 """
 import sys
 from unittest import mock
 
-# 仅用于绕过 store.mysql_store 的 import（其顶层导入 sqlalchemy.ext.asyncio 需 greenlet）；
+# 仅用于绕过 store.postgres_store 的 import（其顶层导入 sqlalchemy.ext.asyncio 需 greenlet）；
 # 真正的注册表读写由下方 monkeypatch 的内存实现替代。
-sys.modules.setdefault("store.mysql_store", mock.MagicMock())
+sys.modules.setdefault("store.postgres_store", mock.MagicMock())
 # 避免 app.api.user 包 __init__ 连带导入 routes_qa / dashboard 路由时报缺依赖
 for _name in [
     "app.api.dashboard.routes_file",
@@ -33,7 +33,7 @@ from store.session_store import SessionStore
 from store.session_store import SessionView
 
 
-# ---- 内存版会话注册表（替代 MySQL，保证 GET 列表/详情可回看） ----
+# ---- 内存版会话注册表（替代 PostgreSQL，保证 GET 列表/详情可回看） ----
 _REGISTRY: dict[tuple, dict] = {}
 
 

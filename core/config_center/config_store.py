@@ -1,4 +1,4 @@
-"""config_store - 配置审批 DAO（ConfigChangeRequest / ConfigReview 的 MySQL 增删改查）。
+"""config_store - 配置审批 DAO（ConfigChangeRequest / ConfigReview 的数据库增删改查）。
 
 从 service 抽出的纯持久化操作；service 只做业务编排（校验 / Nacos 写 / 状态机）。
 所有方法接收调用方传入的 session，事务边界由 service 控制（提交 / 回滚由 service 决定时机）。

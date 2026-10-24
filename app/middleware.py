@@ -226,7 +226,7 @@ async def _capture_request_body(scope: dict, receive: Callable):
 
 
 class ApiLogMiddleware:
-    """API 调用日志中间件（纯 ASGI）：请求/响应各打一条日志，合并落一行到 MySQL。"""
+    """API 调用日志中间件（纯 ASGI）：请求/响应各打一条日志，合并落一行到数据库。"""
 
     def __init__(self, app: Any) -> None:
         self.app = app

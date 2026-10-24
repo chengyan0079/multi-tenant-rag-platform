@@ -1,7 +1,7 @@
 """rag_indexer.pipeline - 单文档索引聚合入口（把现有组件串成"加载→切分→落库"）。
 
 流程：取对象字节 → 落临时目录 → 父子块切分（复用 document_processor.process_documents）
-→ 组装 chunk dict → 写 MySQL rag_chunk（DocDao.save_chunks）→ 向量化 + 写 Milvus
+→ 组装 chunk dict → 写 PostgreSQL rag_chunk（DocDao.save_chunks）→ 向量化 + 写 Milvus
 （MilvusStore.add_chunks，内部 embed + upsert）。索引状态回写由 run_index_job 统一处理。
 
 没有独立 Worker 进程：消费侧是 app/managers/index_manager（Redis 队列 BRPOP）。
@@ -63,7 +63,7 @@ async def build_index(tenant_id: int, doc_id: int, oss_key: str, file_name: str,
                 'ref_id': 0,
             })
 
-        # 落 MySQL 元数据（先删后插，幂等）
+        # 落 PostgreSQL 元数据（先删后插，幂等）
         await DocDao().save_chunks(tenant_id, doc_id, scope, chunks)
         # 向量化 + 写 Milvus（add_chunks 内部 embed + upsert）
         store = app_state.milvus_store

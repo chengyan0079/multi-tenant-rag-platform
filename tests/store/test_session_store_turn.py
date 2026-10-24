@@ -2,7 +2,7 @@
 test_session_store_turn - 问答明细（rag_turn）持久化单测（pytest + mock）
 
 覆盖 docs/会话记录持久化设计方案.md §5 的数据结构与写入行为：
-turn 元素结构、片段只存引用、Redis 追加与裁剪、MySQL 落库幂等、删会话联动。
+turn 元素结构、片段只存引用、Redis 追加与裁剪、数据库落库幂等、删会话联动。
 """
 import asyncio
 import os
@@ -12,7 +12,7 @@ from unittest import mock
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, ROOT)
 
-sys.modules.setdefault("store.mysql_store", mock.MagicMock())
+sys.modules.setdefault("store.postgres_store", mock.MagicMock())
 
 from common.config import config
 from store import session_store as ss
@@ -113,7 +113,7 @@ def test_persist_turn_rows_is_idempotent_on_duplicate():
 def test_persist_turn_rows_swallows_other_errors():
     """落库失败只告警，不抛到主链路。"""
     store = ss.SessionStore()
-    with mock.patch.object(ss, 'get_session', side_effect=RuntimeError('MySQL 挂了')):
+    with mock.patch.object(ss, 'get_session', side_effect=RuntimeError('数据库 挂了')):
         assert _run(store.persist_turn_rows([{'turn_id': 't1'}])) is None
 
 

@@ -4,7 +4,7 @@
 >
 > 以"**FAQ 优先 + RAG 兜底**"双通道为核心，把散落的企业文档和口口相传的经验变成可溯源、可审计、可运营的知识服务，并在检索、生成、会话、治理四个层面完成工程化落地。
 >
-> 技术栈：FastAPI + MySQL + Milvus + Redis + Nacos + MCP。
+> 技术栈：FastAPI + PostgreSQL + Milvus + Redis + Nacos + MCP。
 
 ---
 
@@ -64,9 +64,9 @@
 
 长文档超上下文窗口，做多级压缩：先按 rerank 分数按大小截取，再做相关性精选，必要时才用 LLM 摘要合并，全程保留溯源，异常时回退原样。
 
-多轮追问跨窗口断片，靠会话和记忆补：Redis 存原文并设 TTL，MySQL 存注册表支持长期回看，记忆每 4 轮 compaction 生成 `summary` 和 `facts` 注入生成上下文。
+多轮追问跨窗口断片，靠会话和记忆补：Redis 存原文并设 TTL，PostgreSQL 存注册表支持长期回看，记忆每 4 轮 compaction 生成 `summary` 和 `facts` 注入生成上下文。
 
-租户要隔离、配置变更要能回滚，就做三层隔离（Milvus partition key、Redis key 前缀、MySQL `tenant_id`），提示词和检索阈值托管到 Nacos，写操作一律走申请、复核、执行、回滚的审批流。
+租户要隔离、配置变更要能回滚，就做三层隔离（Milvus partition key、Redis key 前缀、PostgreSQL `tenant_id`），提示词和检索阈值托管到 Nacos，写操作一律走申请、复核、执行、回滚的审批流。
 
 接口可能被绕过网关直连、伪造身份头或重放，用 HMAC-SHA256 签名加 nonce 防重放、时间戳窗口防过期。
 
@@ -111,7 +111,7 @@ flowchart LR
     B --> C[文档加载器解析多格式]
     C --> D[语义父块切分 BGE-M3]
     D --> E[递归子块切分 带 parent_id]
-    E --> F[写 MySQL rag_chunk]
+    E --> F[写 PostgreSQL rag_chunk]
     F --> G[bge-m3 向量化 dense+sparse]
     G --> H[Milvus 双向量 upsert 幂等]
     H --> I[索引状态回写]
@@ -125,9 +125,9 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    S0[Logging stage0] --> S1[Redis/MySQL/Model/FileProvider stage1 并发]
+    S0[Logging stage0] --> S1[Redis/PostgreSQL/Model/FileProvider stage1 并发]
     S1 --> S2[Milvus 依赖 Model]
-    S1 --> S2b[FaqCache 依赖 Redis+MySQL]
+    S1 --> S2b[FaqCache 依赖 Redis+PostgreSQL]
     S1 --> S2c[NacosConfig 依赖 Redis]
     S2 --> S3[NacosDiscover 注册]
     S2c --> S3
@@ -147,8 +147,8 @@ flowchart TD
 | 模块 | 路径 | 职责 |
 |---|---|---|
 | 接入层 | `app/api` `app/main.py` `app/server.py` | 路由 / 鉴权 / 多租户 / trace / 统一响应 / Manager 编排 |
-| 索引链路 | `core/rag_indexer` | 文档获取 → 解析 → 父子块切分 → 向量化 → 落库（MySQL + Milvus） |
-| 存储 | `store` | MySQL 元数据 / Milvus 向量 / Redis 缓存·会话 |
+| 索引链路 | `core/rag_indexer` | 文档获取 → 解析 → 父子块切分 → 向量化 → 落库（PostgreSQL + Milvus） |
+| 存储 | `store` | PostgreSQL 元数据 / Milvus 向量 / Redis 缓存·会话 |
 | 检索 | `core/rag_retriever` | 两路混合召回 + RRF 融合 + Rerank |
 | 模型 | `core/rag_model` | bge-m3（dense+sparse）/ bge-reranker 封装 |
 | 评测运维 | （预留） | RAGAS 评测（LLM 结果审计，规划中）/ 灰度 / 双集合切换 |
@@ -168,7 +168,7 @@ RAG-Ultra/
 │   ├── app_state.py             # 全局单例 + contextvars（tenant/user/trace）
 │   ├── server.py                # AppServer + Manager 启动骨架（stage 编排）
 │   ├── middleware.py            # AuthSignature / ApiLog / Trace 中间件
-│   ├── managers/                # 启动项：Logging/Redis/MySQL/Model/FileProvider/Milvus/
+│   ├── managers/                # 启动项：Logging/Redis/PostgreSQL/Model/FileProvider/Milvus/
 │   │                           #        FaqCache/Index/NacosConfig/NacosDiscover/MCPApi
 │   └── api/
 │       ├── deps.py             # resolve_tenant 身份解析依赖
@@ -186,14 +186,14 @@ RAG-Ultra/
 │   ├── auth/                   # HMAC 签名生成/校验
 │   ├── session/ session_memory/ intent/ file_provider/ utils/
 ├── store/                       # 存储层
-│   ├── orm_models/             # MySQL 元数据 ORM
-│   ├── mysql_store.py redis_store.py milvus_store.py memory_store.py faq_cache.py
+│   ├── orm_models/             # PostgreSQL 元数据 ORM
+│   ├── db.py redis_store.py milvus_store.py memory_store.py faq_cache.py
 │   ├── *_dao.py                # doc/faq/file/session/api_log/health 数据访问
 │   └── redis_keys.py           # Redis key / TTL 集中管理
 ├── common/                      # config.py / logger.py / response.py
 ├── dashboard/                   # (预留) 控制台前端（当前为空目录）
 ├── docs/                        # 架构/部署/鉴权/配置中心/设计方案 文档
-├── scripts/                     # gen_schema.py / gen_auth_headers.py
+├── scripts/                     # gen_schema_pg.py / gen_auth_headers.py
 ├── docker/ tests/ offline/
 ├── models/                      # 模型权重（bge-m3 / bge-reranker），gitignore
 ├── requirements.txt
@@ -209,7 +209,8 @@ RAG-Ultra/
 docker compose -f docker/docker-compose.yml up -d
 
 # 2. 建表
-mysql -h127.0.0.1 -uroot -proot rag_ultra < scripts/schema.sql
+createdb -h127.0.0.1 -U postgres rag_ultra
+psql -h127.0.0.1 -U postgres -d rag_ultra -f scripts/schema_postgresql.sql
 
 # 3. 依赖
 pip install -r requirements.txt
@@ -258,7 +259,7 @@ python run.py        # 生产：uvicorn 多 worker（WORKERS），仅 app（8800
 - 未接网关自测（`IDENTITY_DEFAULT_ENABLED=True`）：缺头兜底 `DEFAULT_TENANT_ID=100` / `DEFAULT_USER_ID=1001`，日志与落库同步兜底值。
 - 网关接入后设 `IDENTITY_DEFAULT_ENABLED=False`：缺头即拒（401），避免漏传头时静默落到默认租户。
 
-三层存储隔离：Milvus **partition key**、Redis **key 前缀**、MySQL **`tenant_id`**；用户级再叠 `X-User-Id` 隔离会话。
+三层存储隔离：Milvus **partition key**、Redis **key 前缀**、PostgreSQL **`tenant_id`**；用户级再叠 `X-User-Id` 隔离会话。
 
 ### 6.3 调用方签名校验
 
@@ -301,11 +302,11 @@ signature = HMAC-SHA256(secret, canonical)        # 64 位 hex，小写比对
 | POST | `/v1/chat/stop` | 停止当前会话的流式生成（幂等） |
 | DELETE | `/v1/chat/context/{session_id}` | 删除当前会话窗口记忆（压缩上下文，不影响历史） |
 | POST | `/v1/sessions` | 创建会话（返回 session_id + 标题） |
-| GET | `/v1/sessions` | 会话列表（读 MySQL 注册表） |
+| GET | `/v1/sessions` | 会话列表（读 PostgreSQL 注册表） |
 | POST | `/v1/sessions/{session_id}/turns` | 追加一轮对话（首轮自动生成标题） |
 | GET | `/v1/sessions/{session_id}` | 会话详情（标题 + 原文 + 记忆） |
 | PATCH | `/v1/sessions/{session_id}` | 更新会话标题 |
-| DELETE | `/v1/sessions/{session_id}` | 删除会话（清 Redis 原文 + 记忆 + MySQL 注册表） |
+| DELETE | `/v1/sessions/{session_id}` | 删除会话（清 Redis 原文 + 记忆 + PostgreSQL 注册表） |
 
 ### 7.2 运营后台（`app/api/dashboard`，前缀 `/admin`）
 
@@ -347,7 +348,7 @@ signature = HMAC-SHA256(secret, canonical)        # 64 位 hex，小写比对
 `/admin/health` 返回 `status` 与 7 项组件状态（均取自内存/连接探测，不发额外网络请求以免被探活刷表）：
 
 ```
-redis / mysql / milvus / model / mcp / nacos / config_center
+redis / postgres / milvus / model / mcp / nacos / config_center
 ```
 
 `mcp` = 业务 API MCP 工具已加载（`app_state.mcp_server` 非空）；`nacos` = 实例注册成功（`NACOS_DISCOVER_STRICT` 决定失败是否阻断启动）；`config_center` = 配置中心长连接已建立。未启用/未就绪为 `False`，不影响 `status`。
@@ -382,7 +383,7 @@ redis / mysql / milvus / model / mcp / nacos / config_center
 
 ## 10. 存储层
 
-- **MySQL**（`store/orm_models` + `mysql_store.py`）：元数据 ORM（租户/知识库/文档/FAQ/会话等），异步 SQLAlchemy 会话池。
+- **PostgreSQL**（`store/orm_models` + `store/db.py`）：元数据 ORM（租户/知识库/文档/FAQ/会话等），异步 SQLAlchemy 会话池（`asyncpg` 驱动）。
 - **Milvus**（`milvus_store.py`）：`rag_chunks` 集合，dense cosine + sparse IP 双向量，partition key 做租户隔离。
 - **Redis**（`redis_store.py` + `redis_keys.py`）：答案/embedding/prompt/faq 缓存、会话原文与记忆、限流令牌桶、聊天停止标记、签名 nonce 去重。key 前缀与 TTL 集中在 `redis_keys.py`，禁止散落硬编码。
 
@@ -397,7 +398,7 @@ redis / mysql / milvus / model / mcp / nacos / config_center
 | 能力 | 当前状态 | 落地依据 |
 |---|---|---|
 | **上下文压缩** `_compress_context` | 已落地 | 按大小（字符数）配置，L0 截取 → L1 相关性精选 → L2 LLM 摘要（默认关）；按句截断、保留溯源、失败回退原样。方案见 `docs/上下文压缩设计方案.md` |
-| **会话记录持久化** `_persist_session` | 已落地 | 一轮两条（user/assistant）写 Redis 会话原文 + MySQL `rag_turn`，异步不阻塞主链路、失败降级；覆盖 cache/faq/rag/empty 全部出口。方案见 `docs/会话记录持久化设计方案.md` |
+| **会话记录持久化** `_persist_session` | 已落地 | 一轮两条（user/assistant）写 Redis 会话原文 + PostgreSQL `rag_turn`，异步不阻塞主链路、失败降级；覆盖 cache/faq/rag/empty 全部出口。方案见 `docs/会话记录持久化设计方案.md` |
 | **LLM 结果审计** `_audit_llm_result` | no-op，仅打日志 | 后续接入 **RAGAS** 评测管道统一落地，不在业务库做质量评估计算与持久化 |
 
 ### 11.2 平台能力

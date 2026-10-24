@@ -287,7 +287,7 @@ class QARouter:
         self, query: str, answer: str, session_id: str | None, intent: str,
         user_id: str | None = None, meta: dict[str, Any] | None = None,
     ) -> None:
-        """问答明细落库：会话原文写 Redis（结构化）+ 明细写 MySQL rag_turn。
+        """问答明细落库：会话原文写 Redis（结构化）+ 明细写 PostgreSQL rag_turn。
 
         meta 携带本轮产出侧信息（turn_id / source / tenant_id / strategy / model /
         chunks / 压缩方式与丢弃数 / 耗时）。异步执行、失败只告警，绝不抛到主链路。
@@ -303,7 +303,7 @@ class QARouter:
         user_item, asst_item, rows = self.session_store.build_turn_payload(
             turn_id=turn_id, user_id=user_id, session_id=session_id, query=query, answer=answer,
             tenant_id=tenant_id, intent=intent, eval_flag=eval_flag, **meta)
-        # 会话原文里同样带上明细字段（QA 属性只在 assistant 侧），回看时无需再查 MySQL
+        # 会话原文里同样带上明细字段（QA 属性只在 assistant 侧），回看时无需再查数据库
         user_extra = {'turn_id': turn_id}
         asst_extra = {k: v for k, v in asst_item.items() if k not in ('role', 'content', 'ts')}
 

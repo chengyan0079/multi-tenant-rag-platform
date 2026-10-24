@@ -1,6 +1,6 @@
 """store/orm_models - ORM 模型按功能拆分后的统一出口。
 
-导入本包即把所有表注册到同一 Base.metadata（供 mysql_manager.create_all 建表）。
+导入本包即把所有表注册到同一 Base.metadata（供 PostgresManager 创建引擎 / Alembic 建表）。
 """
 from store.orm_models.base import Base
 from store.orm_models.knowledge import Doc, Chunk, IndexTask

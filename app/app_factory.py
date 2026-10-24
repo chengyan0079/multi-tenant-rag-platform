@@ -6,8 +6,8 @@ app_factory - FastAPI 应用工厂（uvicorn factory 模式，多进程安全）
 
 启动分 stage（同 stage 内 asyncio.gather 并发，stage 间按序）：
   stage 0：Logging（奠基）
-  stage 1：Redis / MySQL / Model / FileProvider（相互独立，并发）
-  stage 2：Milvus(依赖 Model) / FaqCache(依赖 Redis+MySQL) / NacosConfig(依赖 Redis)
+  stage 1：Redis / PostgreSQL / Model / FileProvider（相互独立，并发）
+  stage 2：Milvus(依赖 Model) / FaqCache(依赖 Redis+PostgreSQL) / NacosConfig(依赖 Redis)
   stage 3：NacosDiscover（服务注册，最后）
 
 配置为 common.config 单例，已由 app_state.settings 暴露，无需单独 ConfigManager。
@@ -25,7 +25,7 @@ from common.logger import logger
 
 from app.managers.logging_manager import LoggingManager
 from app.managers.redis_manager import RedisManager
-from app.managers.mysql_manager import MySQLManager
+from app.managers.postgres_manager import PostgresManager
 from app.managers.faq_cache_manager import FaqCacheManager
 from app.managers.milvus_manager import MilvusManager
 from app.managers.model_manager import ModelManager
@@ -41,11 +41,11 @@ def build_server() -> AppServer:
     server = AppServer("rag-ultra")
     server.register(LoggingManager(), order=10, stage=0)            # 奠基：日志
     server.register(RedisManager(), order=20, stage=1)              # 基础组件
-    server.register(MySQLManager(), order=30, stage=1)              # 基础组件
+    server.register(PostgresManager(), order=30, stage=1)            # 基础组件
     server.register(ModelManager(), order=50, stage=1)              # 基础组件
     server.register(MilvusManager(), order=55, stage=2)             # 依赖 Model（stage 在其后）
     server.register(FileProviderManager(), order=60, stage=1)       # 基础组件
-    server.register(FaqCacheManager(), order=65, stage=2)           # 依赖 Redis+MySQL
+    server.register(FaqCacheManager(), order=65, stage=2)           # 依赖 Redis+PostgreSQL
     server.register(NacosConfigManager(), order=105, stage=2)       # 依赖 Redis
     server.register(NacosDiscoverManager(), order=110, stage=3)     # 服务注册
     server.register(IndexManager(), order=115, stage=3)             # 后台消费（仅起协程，不阻塞）

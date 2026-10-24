@@ -1,10 +1,10 @@
-"""配置中心端到端冒烟测试（需 Nacos 已启动、MySQL 可达）。
+"""配置中心端到端冒烟测试（需 Nacos 已启动、PostgreSQL 可达）。
 
 运行：
     NACOS_CONFIG_SERVER_ADDR=http://<host>:8848 \
     python tests/test_config_center_e2e.py
 
-依赖 common/config 已加载 NACOS_CONFIG_* 与 MySQL 连接配置。
+依赖 common/config 已加载 NACOS_CONFIG_* 与 PostgreSQL 连接配置。
 流程覆盖：新增→通过→执行→loader 热读→修改→回滚→sync_history_nids 补偿。
 """
 import asyncio
@@ -31,8 +31,8 @@ from core.config_center.nacos_config import get_config_center_client
 
 def _build_engine():
     dsn = (
-        f'mysql+aiomysql://{config.MYSQL_USER}:{config.MYSQL_PASSWORD}'
-        f'@{config.MYSQL_HOST}:{config.MYSQL_PORT}/{config.MYSQL_DATABASE}?charset=utf8mb4'
+        f'postgresql+asyncpg://{config.POSTGRES_USER}:{config.POSTGRES_PASSWORD}'
+        f'@{config.POSTGRES_HOST}:{config.POSTGRES_PORT}/{config.POSTGRES_DATABASE}'
     )
     return create_async_engine(dsn, pool_pre_ping=True)
 

@@ -14,7 +14,7 @@ sys.path.insert(0, ROOT)
 
 from unittest import mock
 
-sys.modules.setdefault("store.mysql_store", mock.MagicMock())
+sys.modules.setdefault("store.postgres_store", mock.MagicMock())
 
 from common.config import config
 from core.qa_router import compression

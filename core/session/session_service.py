@@ -1,4 +1,4 @@
-"""会话服务：编排 Redis 原文 + MySQL 注册表 + 记忆压缩（compaction）。
+"""会话服务：编排 Redis 原文 + PostgreSQL 注册表 + 记忆压缩（compaction）。
 
 对外暴露 create / list / get / append_turn / rename / delete 等业务方法。
 会话仅按 user_id 隔离（user_id 由网关 OAuth 全局唯一下发）。
@@ -39,14 +39,14 @@ class SessionService:
         self.memory = memory_service or MemoryService(session_store=self.store)
 
     async def create(self, user_id: str, title: str | None = None) -> tuple[str, str]:
-        """创建会话：Redis 登记 + MySQL 注册表写入；返回 (session_id, title)。"""
+        """创建会话：Redis 登记 + PostgreSQL 注册表写入；返回 (session_id, title)。"""
         sid = await self.store.create_redis(user_id, '')
         t = title or ''
         await self.store.registry_upsert(user_id, sid, title=t)
         return sid, t
 
     async def list(self, user_id: str) -> list[SessionView]:
-        """当前用户的会话列表（富字段，来自 MySQL 注册表）。"""
+        """当前用户的会话列表（富字段，来自 PostgreSQL 注册表）。"""
         return await self.store.registry_list(user_id)
 
     async def get(self, user_id: str, session_id: str) -> dict[str, Any] | None:
@@ -71,7 +71,7 @@ class SessionService:
         """追加一条对话，并维护注册表（预览/轮数/首轮标题）与记忆压缩触发。
 
         extra 为问答明细（turn_id / source / chunks 引用…），只在 assistant 侧传；
-        回看时直接从会话原文就能拿到，不必再查 MySQL。
+        回看时直接从会话原文就能拿到，不必再查数据库。
         """
         await self.store.append_content(user_id, session_id, role, content, extra=extra)
         preview = content[:200]
@@ -95,7 +95,7 @@ class SessionService:
         await self.store.set_meta_title(user_id, session_id, title)
 
     async def delete(self, user_id: str, session_id: str) -> None:
-        """删除会话：Redis 原文/元数据 + 记忆 + MySQL 注册表 + 问答明细。"""
+        """删除会话：Redis 原文/元数据 + 记忆 + PostgreSQL 注册表 + 问答明细。"""
         await self.store.delete_redis(user_id, session_id)
         await self.memory.delete(user_id, session_id)
         await self.store.registry_delete(user_id, session_id)

@@ -12,7 +12,7 @@ from app.app_state import app_state
 from app.server import Manager
 from common.logger import logger
 from core.rag_indexer.pipeline import run_index_job
-from store.mysql_store import get_sessionmaker
+from store.postgres_store import get_sessionmaker
 from store.orm_models.file import File
 from store.orm_models.knowledge import Doc
 from store.redis_keys import index_queue_key

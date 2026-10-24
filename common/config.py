@@ -77,7 +77,7 @@ class Config(BaseSettings):
     FAQ_BM25_THRESHOLD: float = Field(default=2.0, ge=0.0)
 
     # 业务 API 的 MCP 服务：把 app 的 HTTP API 封装成 MCP 工具，启动时加载并起服务，
-    # 供外部 MCP 客户端调用（与上方"基础设施 MCP"区分：那个是 mysql/redis/... 工具）。
+    # 供外部 MCP 客户端调用（与上方"基础设施 MCP"区分：那个是 PostgreSQL/redis/... 工具）。
     MCP_API_ENABLED:   bool = True                            # 是否启用（由 MCPApiManager 加载并起服务）
     MCP_API_TRANSPORT: str  = 'streamable-http'               # 传输方式（需常驻服务，故不用 stdio）
     MCP_API_HOST:      str  = '127.0.0.1'
@@ -112,13 +112,13 @@ class Config(BaseSettings):
     # 文本加载时的备用编码降级顺序：优先编码解码失败后，依次尝试以下编码
     CANDIDATE_ENCODINGS: list[str] = ['utf-8-sig', 'gbk', 'gb2312', 'gb18030', 'big5']
 
-    MYSQL_HOST:     str = 'localhost'
-    MYSQL_PORT:     int = 3306
-    MYSQL_USER:     str = 'root'
-    MYSQL_PASSWORD: str = ''
-    MYSQL_DATABASE: str = 'rag_ultra'
-    MYSQL_POOL_MIN_SIZE: int = 4
-    MYSQL_POOL_MAX_SIZE: int = 16
+    POSTGRES_HOST:     str = 'localhost'
+    POSTGRES_PORT:     int = 5432
+    POSTGRES_USER:     str = 'postgres'
+    POSTGRES_PASSWORD: str = ''
+    POSTGRES_DATABASE: str = 'rag_ultra'
+    POSTGRES_POOL_MIN_SIZE: int = 4
+    POSTGRES_POOL_MAX_SIZE: int = 16
 
     REDIS_HOST:       str = 'localhost'
     REDIS_PORT:       int = 6379
@@ -245,10 +245,10 @@ class Config(BaseSettings):
 
     # 通过 model_config 加载配置（Pydantic V2 官方文档推荐的最佳实践）
     # 注意：当同一个配置项在不同地方重复定义时，Pydantic 会按以下优先级从高到低覆盖
-    # 1. 显式传入的参数：Config(MYSQL_PORT=3307)
-    # 2. 操作系统环境变量：export MYSQL_PORT=3308
-    # 3. 配置文件中定义的变量：.env --> MYSQL_PORT=3306
-    # 4. 类属性默认值：MYSQL_PORT: int = 3306
+    # 1. 显式传入的参数：Config(POSTGRES_PORT=5433)
+    # 2. 操作系统环境变量：export POSTGRES_PORT=5434
+    # 3. 配置文件中定义的变量：.env --> POSTGRES_PORT=5432
+    # 4. 类属性默认值：POSTGRES_PORT: int = 5432
     model_config = SettingsConfigDict(
         env_file=str(BASE_DIR / '.env'),
         env_file_encoding='utf-8',

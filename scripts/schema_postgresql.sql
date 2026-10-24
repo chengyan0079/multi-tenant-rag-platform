@@ -10,17 +10,17 @@
 --     rag_document 为“解析/索引”记录，经 file_upload_id 引用上传版本，不重复文件元数据。
 -- 说明：列默认值由 ORM 在写入时提供（Python 侧 default），故 DDL 不含服务器端 DEFAULT。
 --
--- 与 MySQL 版（schema.sql）的语法差异：
+-- 与 MySQL 版的语法差异（MySQL 版已废弃）：
 --   - 注释用 COMMENT ON（PG 无行内 COMMENT 语法）；
 --   - MEDIUMTEXT -> TEXT；
 --   - 自增主键 BIGINT AUTO_INCREMENT -> BIGSERIAL；
 --   - JSON 列编译为 JSON；若需要 JSONB（支持索引/GIN），可自行替换类型。
 -- ============================================================
 
--- 建库（库名与 .env 的 MYSQL_DATABASE 对齐即可；已有库或库名不同则跳过本句）
-CREATE DATABASE rag_ultra ENCODING 'UTF8';
-
--- psql 下切到该库后执行建表：\connect rag_ultra
+-- 建库（库名与 .env 的 POSTGRES_DATABASE 对齐，默认 rag_ultra）：
+--   CREATE DATABASE rag_ultra ENCODING 'UTF8';
+-- 本脚本只建表；请先建库并连接到该库后再执行（DBeaver/psql 均先连 rag_ultra 再跑本文件）。
+-- 重跑前若库已存在：DBA 侧 DROP DATABASE rag_ultra; 再建，或直接连到空库执行。
 
 
 -- ==========================================================
@@ -118,7 +118,7 @@ CREATE TABLE rag_faq (
   updated_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
   PRIMARY KEY (id)
 );
-COMMENT ON TABLE rag_faq IS '每租户高频问题表（MySQL+Redis 字面匹配；question_type 为意图训练数据源）';
+COMMENT ON TABLE rag_faq IS '每租户高频问题表（PostgreSQL+Redis 字面匹配；question_type 为意图训练数据源）';
 COMMENT ON COLUMN rag_faq.id IS '主键';
 COMMENT ON COLUMN rag_faq.tenant_id IS '租户ID';
 COMMENT ON COLUMN rag_faq.question IS '标准问题';
@@ -164,7 +164,7 @@ COMMENT ON COLUMN rag_file.version_count IS '版本总数';
 COMMENT ON COLUMN rag_file.status IS '状态（1=有效 0=删除）';
 COMMENT ON COLUMN rag_file.created_at IS '创建时间';
 COMMENT ON COLUMN rag_file.updated_at IS '更新时间';
-CREATE INDEX idx_tenant_status ON rag_file (tenant_id, status, updated_at);
+CREATE INDEX idx_file_tenant_status ON rag_file (tenant_id, status, updated_at);
 
 CREATE TABLE rag_file_version (
   id BIGSERIAL NOT NULL,
@@ -334,7 +334,7 @@ COMMENT ON COLUMN rag_config_change_request.created_at IS '创建时间';
 COMMENT ON COLUMN rag_config_change_request.updated_at IS '更新时间';
 CREATE INDEX idx_data ON rag_config_change_request (namespace, group_id, data_id);
 CREATE INDEX idx_domain ON rag_config_change_request (domain);
-CREATE INDEX idx_status ON rag_config_change_request (status);
+CREATE INDEX idx_request_status ON rag_config_change_request (status);
 
 CREATE TABLE rag_config_review (
   id BIGSERIAL NOT NULL,

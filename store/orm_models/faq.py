@@ -1,6 +1,6 @@
 """FAQ 高频问题模型。
 
-设计定位（与 rag-pro 一致，MySQL+Redis，不用 Milvus）：
+设计定位（与 rag-pro 一致，PostgreSQL+Redis，不用 Milvus）：
 - 每租户的高频问题表（租户级，无 kb_id）；手动落库，启动时全量载入 Redis 做缓存。
 - 命中采用字面精确匹配（question + similar_questions 候选），不依赖向量。
 - question_type 与意图分类器标签同源（classifier.py: idx_to_label），作为未来意图
