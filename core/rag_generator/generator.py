@@ -15,6 +15,7 @@ from langchain_openai import ChatOpenAI
 from common.config import config
 from common.logger import logger
 from core.config_center.prompts_manager import RAGPromptsManager
+from core.rag_generator.assembly import assemble_question
 from core.rag_retriever.retriever import RetrievedChunk
 from store.session_store import SessionStore
 from core.session_memory.memory_service import MemoryService
@@ -29,7 +30,9 @@ _FALLBACK_TEMPLATE = (
     "上下文为空或不足以回答时，请用你自身的知识直接回答，不要编造来源。\n"
     "上下文里用 <检索定位区块> ... </检索定位区块> 包裹的片段，"
     "是检索系统命中的核心段落；请在作答时把注意力集中到这些片段上，优先依据它们组织答案。\n"
-    "{context}\n\n用户问题：{question}"
+    "当问题里附带的「长期记忆」或「历史对话」与上下文中的文档内容冲突时，以文档为准——"
+    "文档是现行事实，记忆只是过往会话的摘要。\n"
+    "{context}\n\n{question}"
 )
 
 
@@ -86,6 +89,39 @@ class Generator:
             | llm | StrOutputParser()
         )
 
+    async def _prepare_question(
+        self,
+        query: str,
+        chunks: list[RetrievedChunk],
+        history: list[dict[str, Any]] | None,
+        session_id: str | None,
+        user_id: str | None,
+        template_chars: int = 0,
+    ) -> str:
+        """取历史与记忆，按分层配额装配成"记忆 / 历史 / 当前问题"三段文本。
+
+        检索片段（P0）不在这里裁剪，只把它的字符数计入配额，
+        这样记忆和历史再长也挤不掉证据（设计方案 §4.2）。
+        """
+        if history is None and session_id and user_id:
+            history = await self.conv_store.get_history(
+                user_id, session_id, last=config.HISTORY_MAX_MESSAGES)
+            memory = await self.memory_service.get(user_id, session_id)
+            memory_text = MemoryService.build_injection_text(memory)
+        else:
+            memory_text = ''
+        context_chars = sum(len(c.content or '') for c in chunks)
+        question, _stats = assemble_question(
+            query, history or [], memory_text,
+            context_chars=context_chars, template_chars=template_chars,
+        )
+        return question
+
+    @staticmethod
+    def _template_chars(prompt_template: Any) -> int:
+        """取提示词模板本体的字符数（用于配额计算）；取不到就按 0 处理，不影响链路。"""
+        return len(getattr(prompt_template, 'template', '') or '')
+
     async def generate(
         self,
         query: str,
@@ -95,22 +131,11 @@ class Generator:
         user_id: str | None = None,
     ) -> str:
         """生成答案。history 为空且给了 session_id + user_id 时，按用户隔离取历史与记忆。"""
-        if history is None and session_id and user_id:
-            history = await self.conv_store.get_history(user_id, session_id)
-            memory = await self.memory_service.get(user_id, session_id)
-            memory_text = MemoryService.build_injection_text(memory)
-        else:
-            memory_text = ''
-
-        # 多轮：记忆前置提供长期上下文；历史对话拼到问题前面，缓解指代歧义
-        question = query
-        if memory_text:
-            question = f"{memory_text}\n\n{question}"
-        if history:
-            ctx = "\n".join(f"{h['role']}: {h['content']}" for h in history)
-            question = f"历史对话:\n{ctx}\n\n当前问题: {question}"
-
         prompt_template = await self._answer_prompt()
+        question = await self._prepare_question(
+            query, chunks, history, session_id, user_id,
+            template_chars=self._template_chars(prompt_template),
+        )
         chain = self._build_chain(prompt_template)
         try:
             return await chain.ainvoke({"question": question, "chunks": chunks})
@@ -128,24 +153,14 @@ class Generator:
     ):
         """流式生成：逐 token yield 文本（供 /qa SSE 输出）。
 
-        历史 / 记忆拼接逻辑与 generate 一致；底层链已 streaming=True，
+        历史 / 记忆拼接逻辑与 generate 一致（同一套装配）；底层链已 streaming=True，
         通过 chain.astream 增量产出，失败时 yield 兜底文案。
         """
-        if history is None and session_id and user_id:
-            history = await self.conv_store.get_history(user_id, session_id)
-            memory = await self.memory_service.get(user_id, session_id)
-            memory_text = MemoryService.build_injection_text(memory)
-        else:
-            memory_text = ''
-
-        question = query
-        if memory_text:
-            question = f"{memory_text}\n\n{question}"
-        if history:
-            ctx = "\n".join(f"{h['role']}: {h['content']}" for h in history)
-            question = f"历史对话:\n{ctx}\n\n当前问题: {question}"
-
         prompt_template = await self._answer_prompt()
+        question = await self._prepare_question(
+            query, chunks, history, session_id, user_id,
+            template_chars=self._template_chars(prompt_template),
+        )
         chain = self._build_chain(prompt_template)
         try:
             async for piece in chain.astream({"question": question, "chunks": chunks}):

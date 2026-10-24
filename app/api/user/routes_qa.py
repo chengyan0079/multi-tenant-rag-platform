@@ -95,11 +95,8 @@ async def chat(req: ChatRequest, tenant_id: int = Depends(resolve_tenant)):
             yield {"event": "stopped", "data": json.dumps({"msg": "已停止"}, ensure_ascii=False)}
             yield {"event": "done", "data": "{}"}
 
-        # 历史回写：按 (用户, 会话) 隔离；缺 user_id 时不写，避免串号（停止时写已生成部分）
-        if user_id and session_id and source in ("faq", "rag"):
-            svc = SessionService()
-            await svc.append_turn(user_id, session_id, "user", req.query)
-            await svc.append_turn(user_id, session_id, "assistant", "".join(full_answer))
+        # 历史回写由 QARouter._persist_session 统一负责（含问答明细落库），
+        # 此处不再重复追加，否则一轮会产生 4 条会话元素。
 
     return EventSourceResponse(event_gen())
 

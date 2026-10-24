@@ -43,6 +43,7 @@ class FakeStore:
         self.registry: dict[tuple, SessionView] = {}
         self.titles: dict[tuple, str] = {}
         self.deleted: list[tuple] = []
+        self.turn_rows_deleted: list[tuple] = []
 
     async def create_redis(self, uid, sid):
         sid = sid or "auto"
@@ -50,7 +51,7 @@ class FakeStore:
         self.registry[(uid, sid)] = SessionView(session_id=sid, title="")
         return sid
 
-    async def append_content(self, uid, sid, role, content):
+    async def append_content(self, uid, sid, role, content, extra=None):
         self.appends.append((uid, sid, role, content))
 
     async def get_history(self, uid, sid, last=6):
@@ -84,6 +85,9 @@ class FakeStore:
 
     async def delete_redis(self, uid, sid):
         self.deleted.append((uid, sid))
+
+    async def delete_turn_rows(self, uid, sid):
+        self.turn_rows_deleted.append((uid, sid))
 
 
 def test_create_returns_sid_and_title():
@@ -124,6 +128,7 @@ def test_delete_calls_store_and_memory():
         sid, _ = await svc.create("u1")
         await svc.delete("u1", sid)
         assert ("u1", sid) in store.deleted
+        assert ("u1", sid) in store.turn_rows_deleted   # 明细随会话一起清掉
         assert mem.mem.summary == ""  # delete 重置记忆
     asyncio.run(_run())
 

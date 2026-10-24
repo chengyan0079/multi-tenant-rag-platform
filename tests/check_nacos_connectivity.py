@@ -10,19 +10,21 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from common.config import config
 from core.config_center.nacos_config import ConfigCenterClient, ConfigCenterError
 
 
 def _env(name: str, default: str) -> str:
+    """环境变量优先，未设则回落 common.config（避免脚本里再抄一份默认值）。"""
     return os.environ.get(name, default)
 
 
 def main() -> None:
-    addr = _env('NACOS_CONFIG_SERVER_ADDR', 'http://localhost:8848')
-    ns = _env('NACOS_CONFIG_NAMESPACE', 'rag-ultra')
-    group = _env('NACOS_CONFIG_GROUP', 'DEFAULT_GROUP')
-    user = _env('NACOS_CONFIG_USER', '') or None
-    pwd = _env('NACOS_CONFIG_PASSWORD', '') or None
+    addr = _env('NACOS_CONFIG_SERVER_ADDR', config.NACOS_CONFIG_SERVER_ADDR)
+    ns = _env('NACOS_CONFIG_NAMESPACE', config.NACOS_CONFIG_NAMESPACE)
+    group = _env('NACOS_CONFIG_GROUP', config.NACOS_CONFIG_GROUP)
+    user = _env('NACOS_CONFIG_USER', config.NACOS_CONFIG_USER) or None
+    pwd = _env('NACOS_CONFIG_PASSWORD', config.NACOS_CONFIG_PASSWORD) or None
 
     print('Nacos 配置中心连通性检查')
     print(f'  server_addr = {addr}')

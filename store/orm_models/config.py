@@ -5,6 +5,7 @@ from sqlalchemy import BigInteger, DateTime, SmallInteger, String, Text
 from sqlalchemy import Index
 from sqlalchemy.orm import Mapped, mapped_column
 
+from common.config import config as app_config
 from store.orm_models.base import Base
 
 
@@ -13,7 +14,10 @@ class ConfigChangeRequest(Base):
     __tablename__ = 'rag_config_change_request'
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, comment='主键')
-    namespace: Mapped[str] = mapped_column(String(128), nullable=False, default='rag-ultra', comment='Nacos 命名空间')
+    # 命名空间统一取 config，不在此处另存一份（Nacos 这里要的是命名空间 ID，不是显示名）
+    namespace: Mapped[str] = mapped_column(String(128), nullable=False,
+                                           default=app_config.NACOS_CONFIG_NAMESPACE,
+                                           comment='Nacos 命名空间（取 config.NACOS_CONFIG_NAMESPACE）')
     group_id: Mapped[str] = mapped_column(String(128), nullable=False, default='DEFAULT_GROUP', comment='Nacos 分组')
     data_id: Mapped[str] = mapped_column(String(256), nullable=False, comment='Nacos 配置ID')
     domain: Mapped[str] = mapped_column(String(32), nullable=False, default='prompt', comment='业务域（如 prompt）')

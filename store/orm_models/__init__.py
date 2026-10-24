@@ -7,7 +7,7 @@ from store.orm_models.knowledge import Doc, Chunk, IndexTask
 from store.orm_models.faq import Faq
 from store.orm_models.file import File, FileVersion
 from store.orm_models.config import ConfigChangeRequest, ConfigReview
-from store.orm_models.session import RagSession
+from store.orm_models.session import RagSession, RagTurn
 from store.orm_models.api_log import ApiCallLog
 
 __all__ = [
@@ -16,6 +16,6 @@ __all__ = [
     'Faq',
     'File', 'FileVersion',
     'ConfigChangeRequest', 'ConfigReview',
-    'RagSession',
+    'RagSession', 'RagTurn',
     'ApiCallLog',
 ]

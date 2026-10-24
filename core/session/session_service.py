@@ -66,9 +66,14 @@ class SessionService:
         }
 
     async def append_turn(self, user_id: str, session_id: str,
-                          role: str, content: str) -> None:
-        """追加一轮对话，并维护注册表（预览/轮数/首轮标题）与记忆压缩触发。"""
-        await self.store.append_content(user_id, session_id, role, content)
+                          role: str, content: str,
+                          extra: dict[str, Any] | None = None) -> None:
+        """追加一条对话，并维护注册表（预览/轮数/首轮标题）与记忆压缩触发。
+
+        extra 为问答明细（turn_id / source / chunks 引用…），只在 assistant 侧传；
+        回看时直接从会话原文就能拿到，不必再查 MySQL。
+        """
+        await self.store.append_content(user_id, session_id, role, content, extra=extra)
         preview = content[:200]
         if role == 'user':
             reg = await self.store.registry_get(user_id, session_id)
@@ -90,10 +95,11 @@ class SessionService:
         await self.store.set_meta_title(user_id, session_id, title)
 
     async def delete(self, user_id: str, session_id: str) -> None:
-        """删除会话：Redis 原文/元数据 + 记忆 + MySQL 注册表。"""
+        """删除会话：Redis 原文/元数据 + 记忆 + MySQL 注册表 + 问答明细。"""
         await self.store.delete_redis(user_id, session_id)
         await self.memory.delete(user_id, session_id)
         await self.store.registry_delete(user_id, session_id)
+        await self.store.delete_turn_rows(user_id, session_id)
 
     async def clear_context(self, user_id: str, session_id: str) -> None:
         """删除当前会话的窗口记忆（压缩上下文），不影响对话历史与注册表。"""

@@ -14,12 +14,20 @@ sys.path.insert(0, ROOT)
 
 from unittest import mock
 
+from common.config import config
+
 # MySQL 层依赖 sqlalchemy[asyncio]/greenlet，测试环境可能缺失；此处以 mock 注入，
 # 使 router 模块可导入（MySQL 交互在单测中本就被 mock 掉，不实际触达）。
 sys.modules.setdefault("store.mysql_store", mock.MagicMock())
 
 import core.qa_router.router as m
+from core.qa_router.compression import CompressResult
 from core.rag_retriever.strategy_selector import RetrievalStrategy
+
+
+def _passthrough_compress(q, c, s):
+    """压缩占位：原样返回（模拟未触发压缩）。"""
+    return CompressResult(chunks=c, method='none', kept_indices=list(range(len(c))))
 
 
 def _make_router():
@@ -44,7 +52,7 @@ def test_professional_uses_augmenter():
              mock.patch.object(m, "set_answer") as set_ans:
             router, retr, gen, strat, aug = _make_router()
             with mock.patch.object(router, "_compress_context",
-                                   new=mock.AsyncMock(side_effect=lambda q, c, s: c)) as cmp, \
+                                   new=mock.AsyncMock(side_effect=_passthrough_compress)) as cmp, \
                  mock.patch.object(router, "_persist_session", new=mock.AsyncMock()) as ps, \
                  mock.patch.object(router, "_audit_llm_result", new=mock.AsyncMock()) as au:
                 res = await router.answer("问题", tenant_id=1)
@@ -67,7 +75,7 @@ def test_general_knowledge_answers_directly_without_retrieval():
              mock.patch.object(m, "set_answer"):
             router, retr, gen, strat, aug = _make_router()
             with mock.patch.object(router, "_compress_context",
-                                   new=mock.AsyncMock(side_effect=lambda q, c, s: c)), \
+                                   new=mock.AsyncMock(side_effect=_passthrough_compress)), \
                  mock.patch.object(router, "_persist_session", new=mock.AsyncMock()), \
                  mock.patch.object(router, "_audit_llm_result", new=mock.AsyncMock()):
                 res = await router.answer("问题", tenant_id=1)
@@ -130,7 +138,7 @@ def test_answer_stream_rag_yields_meta_tokens_done():
              mock.patch.object(m, "get_answer", return_value=None), \
              mock.patch.object(m, "set_answer") as set_ans, \
              mock.patch.object(router, "_compress_context",
-                               new=mock.AsyncMock(side_effect=lambda q, c, s: c)), \
+                               new=mock.AsyncMock(side_effect=_passthrough_compress)), \
              mock.patch.object(router, "_persist_session", new=mock.AsyncMock()), \
              mock.patch.object(router, "_audit_llm_result", new=mock.AsyncMock()):
             async for ev, data in router.answer_stream("问题", tenant_id=1):
@@ -139,6 +147,59 @@ def test_answer_stream_rag_yields_meta_tokens_done():
         assert kinds[0] == "meta" and kinds[-1] == "done"
         assert "".join(d for e, d in events if e == "token") == "你好世界"
         set_ans.assert_awaited_once()   # 流式结束后缓存完整答案
+    asyncio.run(_run())
+
+
+def test_cache_and_faq_branches_also_persist():
+    """审计完整性：缓存/FAQ 命中同样落明细，source 要能区分。"""
+    async def _run():
+        for cached, source in [("缓存答案", "cache"), (None, "faq")]:
+            with mock.patch.object(m, "classify_query", return_value="专业咨询"), \
+                 mock.patch.object(m, "get_answer", return_value=cached), \
+                 mock.patch.object(m, "get_faq_answer", return_value=("FAQ 答案", 1)), \
+                 mock.patch.object(m, "set_answer"):
+                router, *_ = _make_router()
+                with mock.patch.object(router, "_persist_session", new=mock.AsyncMock()) as ps:
+                    res = await router.answer("问题", tenant_id=1, session_id="s1", user_id="u1")
+            ps.assert_awaited_once()
+            assert ps.await_args.kwargs["meta"]["source"] == source
+            assert res["source"] == source
+    asyncio.run(_run())
+
+
+def test_persist_meta_carries_compress_and_source():
+    """RAG 分支的落库要带上压缩方式与丢弃数，供可观测与评测取数。"""
+    async def _run():
+        with mock.patch.object(m, "classify_query", return_value="专业咨询"), \
+             mock.patch.object(m, "get_answer", return_value=None), \
+             mock.patch.object(m, "set_answer"):
+            router, *_ = _make_router()
+            with mock.patch.object(router, "_compress_context",
+                                   new=mock.AsyncMock(side_effect=_passthrough_compress)), \
+                 mock.patch.object(router, "_persist_session", new=mock.AsyncMock()) as ps, \
+                 mock.patch.object(router, "_audit_llm_result", new=mock.AsyncMock()):
+                await router.answer("问题", tenant_id=1, session_id="s1", user_id="u1")
+        meta = ps.await_args.kwargs["meta"]
+        assert meta["source"] == "rag" and meta["tenant_id"] == 1
+        assert "turn_id" in meta and meta["latency_ms"] >= 0
+    asyncio.run(_run())
+
+
+def test_persist_failure_does_not_break_answer():
+    """落库失败不得影响主链路：异常被吞掉，回答照常返回。"""
+    async def _run():
+        with mock.patch.object(m, "classify_query", return_value="通用知识"), \
+             mock.patch.object(m, "get_answer", return_value=None), \
+             mock.patch.object(m, "set_answer"):
+            router, *_ = _make_router()
+            with mock.patch.object(router, "_compress_context",
+                                   new=mock.AsyncMock(side_effect=_passthrough_compress)), \
+                 mock.patch.object(router, "_audit_llm_result", new=mock.AsyncMock()), \
+                 mock.patch.object(config, "QA_PERSIST_ASYNC", False), \
+                 mock.patch.object(router.session_store, "persist_turn_rows",
+                                   new=mock.AsyncMock(side_effect=RuntimeError("MySQL 挂了"))):
+                res = await router.answer("问题", tenant_id=1, session_id="s1", user_id="u1")
+        assert res["source"] == "rag" and res["answer"] == "答案"
     asyncio.run(_run())
 
 

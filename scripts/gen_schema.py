@@ -28,8 +28,9 @@ SECTIONS = [
         ("rag_file", "文档/文件列表（一个 base_key 一行，冗余当前版本；版本历史见 rag_file_version）"),
         ("rag_file_version", "文件版本历史（一个版本一行；同文档同内容唯一，幂等去重）"),
     ]),
-    ("2) 用户级表（仅 user_id，无 tenant_id）", [
+    ("2) 用户级表（按 user_id 隔离；rag_turn 另带 tenant_id 仅统计用）", [
         ("rag_session", "会话注册表（列表/元数据持久化；对话原文存 Redis）"),
+        ("rag_turn", "问答明细（一轮两条：user/assistant；与 Redis 会话原文 1:1）"),
     ]),
     ("3) 系统级表（无 tenant_id；配置审批流，复用 Nacos）", [
         ("rag_config_change_request", "配置变更申请"),

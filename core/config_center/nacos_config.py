@@ -2,7 +2,7 @@
 nacos_config - Nacos 3.x 配置中心客户端（直连 Open API）
 
 与服务发现（app/managers/nacos_discover_manager.py，namespace=public）完全独立：
-- 命名空间：config.NACOS_CONFIG_NAMESPACE（默认 rag-ultra）
+- 命名空间：config.NACOS_CONFIG_NAMESPACE（**填命名空间 ID，不是显示名**；默认见 common/config.py，部署用 .env 覆盖）
 - 变量：config.NACOS_CONFIG_*（与 NACOS_* 分离）
 
 Nacos 3.x API 约定（仅 3.x，不做版本兼容）：

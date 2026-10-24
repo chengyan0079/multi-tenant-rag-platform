@@ -396,8 +396,8 @@ redis / mysql / milvus / model / mcp / nacos / config_center
 
 | 能力 | 当前状态 | 落地依据 |
 |---|---|---|
-| **上下文压缩** `_compress_context` | `return chunks`（原样返回，未压缩） | 设计方案见 `docs/上下文压缩设计方案.md`：按大小配置，多级管线 L0 按大小截取 → L1 相关性精选 → L2 LLM 摘要，保留溯源、失败回退 |
-| **会话记录持久化** `_persist_session` | 仅 `logger.debug('未实现，跳过')` | 设计方案见 `docs/会话记录持久化设计方案.md`：复用 `core/session` 存储体系，异步落库不阻塞主链路 |
+| **上下文压缩** `_compress_context` | 已落地 | 按大小（字符数）配置，L0 截取 → L1 相关性精选 → L2 LLM 摘要（默认关）；按句截断、保留溯源、失败回退原样。方案见 `docs/上下文压缩设计方案.md` |
+| **会话记录持久化** `_persist_session` | 已落地 | 一轮两条（user/assistant）写 Redis 会话原文 + MySQL `rag_turn`，异步不阻塞主链路、失败降级；覆盖 cache/faq/rag/empty 全部出口。方案见 `docs/会话记录持久化设计方案.md` |
 | **LLM 结果审计** `_audit_llm_result` | no-op，仅打日志 | 后续接入 **RAGAS** 评测管道统一落地，不在业务库做质量评估计算与持久化 |
 
 ### 11.2 平台能力

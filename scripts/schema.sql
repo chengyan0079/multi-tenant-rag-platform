@@ -125,7 +125,7 @@ CREATE INDEX idx_tenant_base ON rag_file_version (tenant_id, base_key);
 
 
 -- ==========================================================
--- 2) 用户级表（仅 user_id，无 tenant_id）
+-- 2) 用户级表（按 user_id 隔离；rag_turn 另带 tenant_id 仅统计用）
 -- ==========================================================
 
 CREATE TABLE rag_session (
@@ -143,6 +143,33 @@ CREATE TABLE rag_session (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='会话注册表（列表/元数据持久化；对话原文存 Redis）';
 CREATE INDEX idx_user ON rag_session (user_id);
 
+CREATE TABLE rag_turn (
+  id BIGINT NOT NULL COMMENT '主键' AUTO_INCREMENT,
+  turn_id VARCHAR(32) NOT NULL COMMENT '一轮问答ID（同轮两条共享）',
+  user_id VARCHAR(64) NOT NULL COMMENT '用户ID',
+  session_id VARCHAR(64) NOT NULL COMMENT '会话ID',
+  tenant_id BIGINT NOT NULL COMMENT '租户ID（仅统计）',
+  `role` VARCHAR(16) NOT NULL COMMENT '消息角色：user|assistant',
+  content MEDIUMTEXT NOT NULL COMMENT '消息正文',
+  intent VARCHAR(32) COMMENT '意图：通用知识|专业咨询',
+  source VARCHAR(16) COMMENT '产出来源：cache|faq|rag|empty',
+  strategy VARCHAR(32) COMMENT '检索策略',
+  model VARCHAR(64) COMMENT '生成模型',
+  chunks_json MEDIUMTEXT COMMENT '召回片段引用 JSON',
+  prompt_tokens INTEGER COMMENT '提示词 token',
+  completion_tokens INTEGER COMMENT '生成 token',
+  latency_ms INTEGER COMMENT '端到端耗时',
+  compress_method VARCHAR(16) COMMENT '上下文压缩方式',
+  compress_dropped INTEGER COMMENT '压缩丢弃片段数',
+  eval_flag INTEGER NOT NULL COMMENT '评测采样标记',
+  created_at DATETIME NOT NULL COMMENT '创建时间',
+  PRIMARY KEY (id),
+  CONSTRAINT uk_turn_role UNIQUE (turn_id, `role`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='问答明细（一轮两条：user/assistant；与 Redis 会话原文 1:1）';
+CREATE INDEX idx_created ON rag_turn (created_at);
+CREATE INDEX idx_tenant_created ON rag_turn (tenant_id, created_at);
+CREATE INDEX idx_user_session ON rag_turn (user_id, session_id);
+
 
 -- ==========================================================
 -- 3) 系统级表（无 tenant_id；配置审批流，复用 Nacos）
@@ -150,7 +177,7 @@ CREATE INDEX idx_user ON rag_session (user_id);
 
 CREATE TABLE rag_config_change_request (
   id BIGINT NOT NULL COMMENT '主键' AUTO_INCREMENT,
-  namespace VARCHAR(128) NOT NULL COMMENT 'Nacos 命名空间',
+  namespace VARCHAR(128) NOT NULL COMMENT 'Nacos 命名空间（取 config.NACOS_CONFIG_NAMESPACE）',
   group_id VARCHAR(128) NOT NULL COMMENT 'Nacos 分组',
   data_id VARCHAR(256) NOT NULL COMMENT 'Nacos 配置ID',
   domain VARCHAR(32) NOT NULL COMMENT '业务域（如 prompt）',

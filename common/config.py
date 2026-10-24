@@ -45,6 +45,28 @@ class Config(BaseSettings):
     RRF_K:           int = Field(default=60, ge=1)    # RRF 常数 k
     SUBQUERY_MAX:          int = Field(default=3, ge=1)             # 子查询拆分最大条数
     STRATEGY_SELECT_ENABLED: bool = True                            # 是否启用 LLM 检索策略路由（关闭则专业咨询也走直接检索）
+
+    # 问答明细落库（详见 docs/会话记录持久化设计方案.md）
+    QA_PERSIST_ENABLED:         bool = True    # 总开关；false 时 _persist_session 直接返回（保持 no-op 行为）
+    QA_PERSIST_ASYNC:           bool = True    # 异步落库；false 走同步 await（单测/排障用）
+    QA_PERSIST_MAX_TURNS:       int = 400      # Redis LIST 单会话保留的消息条数（一轮 2 条），超出 LTRIM
+    QA_PERSIST_MAX_CONCURRENCY: int = 32       # 异步落库并发上限，超出丢弃并告警（不拖慢主链路）
+    QA_PERSIST_CHUNK_FULLTEXT:  bool = False   # chunks 是否附带片段全文；默认只存引用（doc_name/page/score）
+    QA_EVAL_SAMPLE_RATE:        float = Field(default=0.05, ge=0.0, le=1.0)  # 评测采样率，命中时 rag_turn.eval_flag=1
+
+    # 上下文装配与压缩（按字符数配置，非 token；详见 docs/上下文压缩设计方案.md）
+    # 多轮装配侧：记忆 / 历史注入上限
+    HISTORY_MAX_MESSAGES: int = Field(default=6, ge=0)   # 注入 prompt 的历史消息条数（替代 get_history 写死的 last=6）
+    MEMORY_MAX_CHARS:     int = Field(default=2000, ge=0)  # 记忆注入文本字符上限，超限按句截断
+    ASSEMBLY_MAX_PROMPT_CHARS: int = Field(default=24000, ge=0)  # 送进模型的 prompt 总字符额度（system+context+question）
+    ASSEMBLY_MIN_HISTORY_MESSAGES: int = Field(default=2, ge=0)  # 需要裁剪时历史消息的下限（保最近几条，支撑指代消解）
+    # 检索片段压缩侧：L0 截取 / L1 精选 / L2 摘要
+    COMPRESS_STRATEGY:              str   = 'truncate'   # none | truncate | select | summary（summary 含 L2）
+    COMPRESS_MAX_TOTAL_CHARS:       int   = Field(default=8000, ge=0)    # 软上限：累计字符数，超过按分数截取
+    COMPRESS_MAX_CHUNK_CHARS:       int   = Field(default=1500, ge=0)    # 单片段字符上限，超出的先按句截短
+    COMPRESS_HARD_TOTAL_CHARS:      int   = Field(default=16000, ge=0)   # 硬上限：超过则强制截取或启用 L2 摘要
+    COMPRESS_SIM_THRESHOLD:         float = Field(default=0.3, ge=0.0)   # L1 相关性丢弃阈值（select/summary 生效）
+    COMPRESS_LLM_SUMMARY_ENABLED:   bool  = False        # 是否允许 L2（付费）；false 时超硬上限退化为强制截取
     DENSE_WEIGHT:    float = Field(default=0.7, ge=0.0, le=1.0)     # 加权融合稠密权重
     SPARSE_WEIGHT:   float = Field(default=0.3, ge=0.0, le=1.0)     # 加权融合稀疏权重
 
@@ -188,7 +210,7 @@ class Config(BaseSettings):
     # 配置中心（nacos，独立命名空间，与"服务发现"的 NACOS_* 变量分离）
     NACOS_CONFIG_ENABLED:     bool = True
     NACOS_CONFIG_SERVER_ADDR: str = 'http://localhost:8848'
-    NACOS_CONFIG_NAMESPACE:   str = 'rag-ultra'
+    NACOS_CONFIG_NAMESPACE:   str = '394fd817-95d4-42aa-9479-d9df9229ea5f'
     NACOS_CONFIG_GROUP:       str = ConfigGroup.SYSTEM.value   # 兜底组：调用方不指定 group 时回退到此值
     NACOS_CONFIG_USER:        str = ''         # 当前 Nacos 无鉴权，留空占位；开启鉴权后填账号
     NACOS_CONFIG_PASSWORD:    str = ''         # 当前 Nacos 无鉴权，留空占位；开启鉴权后填密码
