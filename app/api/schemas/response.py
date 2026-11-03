@@ -164,6 +164,23 @@ class DocStatusData(BaseModel):
     status: str = Field(..., description="索引状态")
 
 
+class DocVersionItem(BaseModel):
+    version: int = Field(..., description="版本号")
+    chunk_count: int = Field(0, description="该版本切片数")
+    enabled: int = Field(0, description="是否生效（1=生效 0=历史）")
+
+
+class DocVersionsData(BaseModel):
+    doc_id: int = Field(..., description="文档 id")
+    versions: list[DocVersionItem] = Field(default_factory=list, description="版本列表（含历史）")
+
+
+class DocRollbackData(BaseModel):
+    doc_id: int = Field(..., description="文档 id")
+    version: int = Field(..., description="回滚到的目标版本")
+    enabled: int = Field(0, description="回滚后生效切片数")
+
+
 # ============ 检索调试（运营后台，SSE chunk 事件的负载形状）============
 class RetrieveChunkItem(BaseModel):
     chunk_id: int | None = Field(None, description="切片 id")
@@ -233,7 +250,7 @@ __all__ = [
     "DocumentListItem", "DocumentListData",
     "FileVersionItem", "FileVersionsData",
     "FileBatchItem",
-    "DocCreateResult", "DocStatusData",
+    "DocCreateResult", "DocStatusData", "DocVersionItem", "DocVersionsData", "DocRollbackData",
     "RetrieveChunkItem", "RetrieveData",
     "HealthData",
     "ConfigRequestItem", "ConfigRequestListData", "SyncHistoryResult",

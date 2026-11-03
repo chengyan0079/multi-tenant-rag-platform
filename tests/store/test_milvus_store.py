@@ -61,3 +61,45 @@ def test_ensure_collection_loads_when_exists() -> None:
     asyncio.run(store.ensure_collection())
     assert client.created is False  # 已存在 → 不创建
     assert client.loaded is True    # 直接加载
+
+
+def _import_funcs():
+    mod = _import_mod()
+    return mod
+
+
+def test_build_filter_expr_base_only() -> None:
+    mod = _import_funcs()
+    expr = mod._build_filter_expr(100, 0)
+    assert expr == 'tenant_id == 100 and scope == 0'
+
+
+def test_build_filter_expr_with_doc_ids() -> None:
+    mod = _import_funcs()
+    expr = mod._build_filter_expr(100, 0, {'doc_ids': [1, 2, 3]})
+    assert 'doc_id in [1, 2, 3]' in expr
+    assert 'tenant_id == 100' in expr
+
+
+def test_build_filter_expr_with_doc_and_ref_ids() -> None:
+    mod = _import_funcs()
+    expr = mod._build_filter_expr(100, 1, {'doc_ids': [5], 'ref_ids': [7, 8]})
+    assert 'doc_id in [5]' in expr
+    assert 'ref_id in [7, 8]' in expr
+    assert 'scope == 1' in expr
+
+
+def test_build_filter_expr_ignores_empty_filters() -> None:
+    mod = _import_funcs()
+    expr = mod._build_filter_expr(100, 0, {'doc_ids': []})
+    assert 'doc_id' not in expr  # 空列表不下推
+
+
+def test_stable_chunk_id_deterministic_and_version_sensitive() -> None:
+    mod = _import_funcs()
+    a = mod.stable_chunk_id(100, 1, 1, 'p1', 0)
+    b = mod.stable_chunk_id(100, 1, 1, 'p1', 0)
+    assert a == b  # 同输入恒定
+    c = mod.stable_chunk_id(100, 1, 2, 'p1', 0)
+    assert a != c  # 不同版本主键不冲突（支持回滚共存）
+

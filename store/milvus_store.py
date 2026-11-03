@@ -10,6 +10,7 @@ dense(1024 维, 内积 IP + L2 归一化 == 余弦) / sparse(倒排, 内积)。
 （文档/切片为租户级，不再挂知识库，故无 kb_id 维度。）
 """
 import asyncio
+import hashlib
 from typing import Any
 
 import numpy as np
@@ -43,6 +44,37 @@ def _l2_normalize(vec: Any):
     arr = np.asarray(vec, dtype='float32')
     norm = float(np.linalg.norm(arr))
     return arr if norm == 0.0 else (arr / norm)
+
+
+def _build_filter_expr(tenant_id: int, scope: int,
+                       filters: dict[str, Any] | None = None) -> str:
+    """构造 Milvus 布尔过滤表达式。
+
+    基础条件固定为 tenant_id + scope（租户与范围隔离）；filters 下推业务级裁剪，
+    目前支持 doc_ids / ref_ids（文档级 / FAQ 关联级权限），检索据此只扫有权限的范围。
+    """
+    clauses = [f'tenant_id == {tenant_id}', f'scope == {scope}']
+    if filters:
+        doc_ids = filters.get('doc_ids')
+        if isinstance(doc_ids, (list, tuple)) and doc_ids:
+            clauses.append(f'doc_id in {list(doc_ids)}')
+        ref_ids = filters.get('ref_ids')
+        if isinstance(ref_ids, (list, tuple)) and ref_ids:
+            clauses.append(f'ref_id in {list(ref_ids)}')
+    return ' and '.join(clauses)
+
+
+def stable_chunk_id(tenant_id: int, doc_id: int, version: int,
+                   parent_id: str, seq: int) -> int:
+    """稳定 chunk_id（INT64）：相同输入恒定，供 Milvus upsert 幂等覆盖。
+
+    与旧实现相比把 version 编入，使同一文档的不同版本拥有互不冲突的主键——
+    旧版本实体保留在 Milvus 中（仅被检索侧删除/停用），支持版本回滚。
+    """
+    raw = hashlib.md5(
+        f'{tenant_id}:{doc_id}:{version}:{parent_id}:{seq}'.encode()
+    ).hexdigest()[:15]
+    return int(raw, 16)
 
 
 class MilvusStore:
@@ -138,8 +170,13 @@ class MilvusStore:
         tenant_id: int,
         top_k: int = 20,
         fusion: str = 'rrf',
+        filters: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
-        """两路召回 + 融合。scope 区分文档库(0)与 FAQ 库(1)；tenant_id 做租户隔离。"""
+        """两路召回 + 融合。scope 区分文档库(0)与 FAQ 库(1)；tenant_id 做租户隔离。
+
+        :param filters: 业务级裁剪条件（如 {'doc_ids': [...]} 限制可检索文档），
+            透传到 Milvus 过滤表达式，实现文档/权限级隔离。
+        """
         if not query or not query.strip():
             return []
         if self.model is None:
@@ -149,7 +186,7 @@ class MilvusStore:
         dense_vec = _l2_normalize(q_emb['dense'][0])
         sparse_vec = _parse_sparse_row(q_emb['sparse'], 0)
 
-        filter_expr = f'tenant_id == {tenant_id} and scope == {scope}'
+        filter_expr = _build_filter_expr(tenant_id, scope, filters)
         dense_req = AnnSearchRequest(
             data=[dense_vec], anns_field='dense',
             param={'metric_type': 'IP', 'params': {'ef': 64}},
@@ -174,6 +211,17 @@ class MilvusStore:
         if not results or not results[0]:
             return []
         return [hit['entity'] for hit in results[0]]
+
+    async def delete_by_chunk_ids(self, chunk_ids: list[int]) -> None:
+        """按主键批量删除向量实体（版本回滚/失效时清理旧版本数据）。
+
+        Milvus 删除走表达式删除，需在主键上过滤；chunk_ids 为空直接返回。
+        """
+        if not chunk_ids:
+            return
+        expr = f'chunk_id in {list(chunk_ids)}'
+        await self.client.delete(collection_name=config.MILVUS_COLLECTION, expr=expr)
+        logger.info(f'删除向量实体 {len(chunk_ids)} 条')
 
 
 if __name__ == '__main__':

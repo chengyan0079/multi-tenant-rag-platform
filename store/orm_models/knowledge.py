@@ -22,6 +22,7 @@ class Doc(Base):
     tenant_id: Mapped[int] = mapped_column(BigInteger, nullable=False, comment='租户ID')
     file_upload_id: Mapped[int] = mapped_column(BigInteger, nullable=False, comment='来源上传记录ID（rag_file_upload.id）')
     doc_type: Mapped[int] = mapped_column(SmallInteger, default=0, comment='文档类型（0=普通文档 1=FAQ来源；对应切片 scope）')
+    version: Mapped[int] = mapped_column(Integer, default=1, comment='当前生效版本号（重新索引 +1，旧版本切片 soft-delete）')
     file_hash: Mapped[str | None] = mapped_column(String(64), comment='解析时文件内容哈希快照（幂等/去重）')
     status: Mapped[int] = mapped_column(SmallInteger, comment='解析状态（0=待解析 1=解析中 2=已完成 3=失败）')
     chunk_count: Mapped[int] = mapped_column(Integer, default=0, comment='生成切片数')
@@ -42,9 +43,11 @@ class Chunk(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, comment='主键')
     tenant_id: Mapped[int] = mapped_column(BigInteger, nullable=False, comment='租户ID')
     doc_id: Mapped[int] = mapped_column(BigInteger, nullable=False, comment='所属解析记录ID（rag_document.id）')
+    chunk_id: Mapped[int] = mapped_column(BigInteger, default=0, server_default='0', comment='Milvus 稳定主键（stable_chunk_id），用于按 chunk_id 回查正文与答案溯源')
     scope: Mapped[int] = mapped_column(SmallInteger, default=0, comment='范围（0=doc 1=faq）')
     ref_id: Mapped[int] = mapped_column(BigInteger, default=0, comment='关联ID（scope=1 时指向 rag_faq.id）')
     seq: Mapped[int] = mapped_column(Integer, comment='序号')
+    version: Mapped[int] = mapped_column(Integer, default=1, comment='所属版本（与 rag_document.version 对齐）')
     content: Mapped[str] = mapped_column(Text, comment='切片内容')
     token_count: Mapped[int] = mapped_column(Integer, comment='token 数')
     meta: Mapped[dict] = mapped_column(JSON, comment='元数据（JSON）')
@@ -54,6 +57,7 @@ class Chunk(Base):
 
     __table_args__ = (
         Index('idx_doc', 'tenant_id', 'doc_id'),
+        Index('idx_chunk_id', 'chunk_id'),
     )
 
 

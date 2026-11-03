@@ -11,11 +11,9 @@ FAQ 命中时不调用大模型，未命中再走 RAG。FAQ 匹配见 store.faq_
 
 检索条数由 config.RECALL_K（召回候选）/ config.RERANK_TOP_K（精排保留）统一控制，不按请求传 top_k。
 
-预留占位能力（调用点已打通，逻辑待落地，详见 docs/ 下对应设计方案）：
-  - 上下文压缩（待设计，见 docs/上下文压缩设计方案.md）：检索片段超长时压缩后再生成
-  - 会话记录持久化（待设计，见 docs/会话记录持久化设计方案.md）
-  - LLM 结果审计（后续接入 RAGAS 评测管道，不在业务库持久化）：审计/质量评估交由 RAGAS
-（答案缓存前置已落地，不在此列。）
+上下文压缩与会话记录持久化均已落地（设计方案见 docs/ 下对应文档）；LLM 结果审计
+保持 no-op——检索/生成质量评估交由离线 RAGAS 评测管道（offline/rag_eval.py），
+不在业务库做质量计算与持久化，避免给主链路引入重依赖。
 """
 import asyncio
 import random
@@ -61,6 +59,7 @@ class QARouter:
         tenant_id: int,
         session_id: str | None = None,
         user_id: str | None = None,
+        filters: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """问答主流程，返回 {answer, source, chunks, session_id, intent}。
 
@@ -105,7 +104,7 @@ class QARouter:
             # 专业咨询：LLM 选检索增强策略；检索无命中才回复"未找到"
             strategy = await self.strategy_selector.select_strategy(query)
             rag_hits = await self.augmenter.augment_and_retrieve(
-                query, strategy, tenant_id=tenant_id)
+                query, strategy, tenant_id=tenant_id, filters=filters)
             if not rag_hits:
                 await self._persist_session(query, '抱歉，未找到答案！', session_id, intent, user_id,
                                             meta={'turn_id': turn_id, 'source': 'empty',
@@ -147,6 +146,7 @@ class QARouter:
         tenant_id: int,
         session_id: str | None = None,
         user_id: str | None = None,
+        filters: dict[str, Any] | None = None,
     ):
         """流式问答：与 answer 同链路，但逐段 yield (event, data) 供 SSE 输出。
 
@@ -202,7 +202,7 @@ class QARouter:
         else:
             strategy = await self.strategy_selector.select_strategy(query)
             rag_hits = await self.augmenter.augment_and_retrieve(
-                query, strategy, tenant_id=tenant_id)
+                query, strategy, tenant_id=tenant_id, filters=filters)
             if not rag_hits:
                 # 专业咨询检索无命中：不生成，直接回复"未找到"
                 await self._persist_session(query, '抱歉，未找到答案！', session_id, intent, user_id,
@@ -324,7 +324,7 @@ class QARouter:
         self, query: str, answer: str, chunks: list[RetrievedChunk], strategy: RetrievalStrategy | None,
         user_id: str | None = None,
     ) -> None:
-        """LLM 结果审计占位：审计/质量评估交由 RAGAS 评测管道，不在业务库持久化。"""
-        # 后续由 RAGAS 评测框架落地：question/answer/context/strategy 作为评测信号采集，
-        # 不在此做业务库写入（保留 no-op，避免无依赖时阻断主链路）。
-        logger.debug(f'LLM 结果审计交由 RAGAS 评测管道，跳过 [strategy={strategy}, user={user_id}]')
+        """LLM 结果审计：线上保持 no-op，质量评估交由离线 RAGAS 评测（offline/rag_eval.py）。"""
+        # 评测信号（question/answer/context/strategy）已随 rag_turn 落库，离线脚本可抽取
+        # 成 (user_input, response, retrieved_contexts, reference) 数据集跑 RAGAS，无需在此写业务库。
+        logger.debug(f'LLM 结果审计交由离线 RAGAS 评测管道，跳过 [strategy={strategy}, user={user_id}]')

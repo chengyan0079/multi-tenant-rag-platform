@@ -1,0 +1,7 @@
+# 离线 RAGAS 评测依赖（不进运行时 requirements.txt，单独环境安装）
+# 安装：pip install -r offline/requirements.ragas.txt
+ragas>=0.2.0
+langchain-community<0.4
+openai>=1.0
+pydantic>=2.0
+python-dotenv>=1.0

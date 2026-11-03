@@ -1,32 +1,28 @@
-# 多租户的企业级检索增强问答（RAG）中台
+# 多租户企业级 RAG 中台
 
-> **定位**：面向多租户的企业级检索增强问答（RAG）中台，解决企业级文档管理与检索困难——让"资料存得下、找不到、不敢用"变成"问一句就得到带出处的答案"。
->
-> 以"**FAQ 优先 + RAG 兜底**"双通道为核心，把散落的企业文档和口口相传的经验变成可溯源、可审计、可运营的知识服务，并在检索、生成、会话、治理四个层面完成工程化落地。
->
-> 技术栈：FastAPI + PostgreSQL + Milvus + Redis + Nacos + MCP。
+企业文档管理和检索长期存在"存得下、找不到、不敢用"的问题。本项目做的是一个面向多租户的检索增强问答中台，采用「FAQ 优先 + RAG 兜底」两条通道，把企业文档和一线经验沉淀成可溯源、可审计的知识服务。
+
+技术栈：FastAPI + PostgreSQL + Milvus + Redis + Nacos + MCP。
 
 ---
 
-## 1. 为什么要做这个项目（背景与痛点）
+## 1. 背景
 
-### 1.1 现状：过去是怎么找资料的
+### 1.1 现状：资料是怎么被找到的
 
-企业一线员工要拿到一个准确答案，靠的往往不是系统，而是"问人"和"翻文档"。
+一线员工要拿一个准确答案，主要靠"问人"和"翻文档"。
 
-问人是常态。遇到问题时，习惯在工位上喊一嗓子、在群里 @ 老员工——"这个之前谁处理过""上次是怎么定的"。答案靠经验和记忆传递，人一走就断。
+问人是常态。遇到问题时在工位上喊一声、在群里 @ 老员工——"这个之前谁处理过""上次怎么定的"。答案靠经验和记忆传递，人一走就断。
 
-翻文档是兜底。共享盘、邮件附件、本地文件夹里翻 PDF、Word 和扫描件，手册动辄几百上千页，定位一个条款要十几分钟。营业高峰或检修窗口这种争分夺秒的场景，根本等不起。
+翻文档是兜底。共享盘、邮件附件、本地文件夹里翻 PDF、Word、扫描件，手册动辄几百上千页，定位一个条款要十几分钟。营业高峰或检修窗口这种争分夺秒的场景，根本等不起。
 
-问题是即便翻到了也不一定敢用。同一个问题问三个人可能有三种说法，谁对全凭资历；真出了事，谁也拿不出"当时依据的是哪份文件"。
+问题是翻到了也不一定敢用。同一个问题问三个人可能有三种说法，谁对全凭资历；真出了事，谁也拿不出"当时依据的是哪份文件"。
 
 一句话：资料存得下，却找不到；找到了，也不敢确定是不是现行有效版本。
 
-### 1.2 核心痛点：企业级文档管理与检索困难
+### 1.2 核心痛点
 
-这些表象背后是同一个问题：企业缺少对文档的统一管理和有效检索。
-
-资料分散在各处。PLM、OA、共享盘、邮件、聊天记录里都有，格式从 PDF、Word、PPT 到表格、扫描件不等，始终没有一个统一的检索入口。
+资料分散。PLM、OA、共享盘、邮件、聊天记录里都有，格式从 PDF、Word、PPT 到表格、扫描件不等，始终没有一个统一检索入口。
 
 存得下但找不到。关键词检索搜不到语义相关的内容，按文件名更不可能定位到内容里的条款。
 
@@ -34,21 +30,21 @@
 
 经验跟着人走。口口相传的东西留不下来，人员一流动就断层，新人上手周期被拉长。
 
-口径对不齐。同一个问题不同人给出的答案不同，对外或合规场景没法保证统一口径。
+口径对不齐。同一个问题不同人给的答案不同，对外或合规场景没法保证统一口径。
 
 依据拿不出。给出答案却没有出处，出问题难定责；文档变更也没留痕、不可回滚。
 
 ### 1.3 为什么不是"直接接一个大模型"
 
-把文档丢给通用大模型，看起来能解决，落到生产会碰到三个断层。
+把文档丢给通用大模型，落到生产会碰到三个断层。
 
 检索上，纯语义向量对型号、条款号、报警码、专有名词这类需要字面精确的查询会失效；用户口语化的提问和文档书面术语对不上，又会漏召回。
 
 生成上，所有问题无差别调用 LLM，成本和延迟都压不住；而且模型改写会让同一问题在不同时间给出不同表述，合规场景不能用。
 
-工程上，缺租户隔离、配置治理、审计留痕和优雅降级，进不了生产。
+工程上，缺租户隔离、配置治理、审计留痕和故障降级，进不了生产。
 
-所以中台的定位是：不只做检索加生成，而是把散落文档和经验统一纳管，让员工问一句就能拿到带出处的答案，同时把多租户隔离、混合检索、成本分层、多轮记忆、配置审批流、全链路审计和启动编排补齐，让它具备进生产的条件。
+所以中台的定位是：不只做检索加生成，而是把散落文档和经验统一纳管，让员工问一句就能拿到带出处的答案，同时把多租户隔离、混合检索、成本分层、多轮记忆、配置审批流、审计和启动编排补齐，让它具备上生产的条件。
 
 ### 1.4 关键设计取舍
 
@@ -60,7 +56,7 @@
 
 经验留不下来、口径对不齐，靠 FAQ 优先：高频问题命中标准答案后直接返回权威原文，不调 LLM，成本为零且口径统一，长尾才走检索增强生成。
 
-拿不出依据，就让回答带上 `doc_name / page` 出处，再用 trace_id 全链路透传、API 日志落库和问答明细异步持久化，形成可举证的档案。
+拿不出依据，就让回答带上 `doc_name / page` 出处，再用 trace_id 透传、API 日志落库和问答明细异步持久化，形成可举证的档案。
 
 长文档超上下文窗口，做多级压缩：先按 rerank 分数按大小截取，再做相关性精选，必要时才用 LLM 摘要合并，全程保留溯源，异常时回退原样。
 
@@ -117,7 +113,7 @@ flowchart LR
     H --> I[索引状态回写]
 ```
 
-> 子块 metadata 保留 `parent_id` / `parent_content`，检索时可回退到父块上下文；`chunk_id` 由 `(tenant_id, doc_id, parent_id, seq)` 稳定生成，保证 Milvus upsert 幂等覆盖。
+> 子块 metadata 保留 `parent_id` / `parent_content`，检索时可回退到父块上下文；`chunk_id` 由 `stable_chunk_id(tenant_id, doc_id, version, parent_id, seq)` 稳定生成（编入 `version` 使各版本主键不冲突），保证 Milvus upsert 幂等覆盖，且支撑版本回滚。该值同时落 `rag_chunk.chunk_id` 列，供离线评测按 `chunks_json.chunk_id` 回查正文（见 §11.3）。
 
 ### 2.3 启动与关闭
 
@@ -138,7 +134,7 @@ flowchart TD
     SIG[SIGINT/SIGTERM] --> SH[逆序 stop 释放资源]
 ```
 
-> 任一 Manager 启动失败即记"启动失败"；非关键组件（如意图分类模型缺失）支持优雅降级，不阻断整体启动。
+> 任一 Manager 启动失败即记"启动失败"；非关键组件（如意图分类模型缺失）支持降级，不阻断整体启动。
 
 ---
 
@@ -151,7 +147,7 @@ flowchart TD
 | 存储 | `store` | PostgreSQL 元数据 / Milvus 向量 / Redis 缓存·会话 |
 | 检索 | `core/rag_retriever` | 两路混合召回 + RRF 融合 + Rerank |
 | 模型 | `core/rag_model` | bge-m3（dense+sparse）/ bge-reranker 封装 |
-| 评测运维 | （预留） | RAGAS 评测（LLM 结果审计，规划中）/ 灰度 / 双集合切换 |
+| 评测运维 | `offline/rag_eval.py` `scripts/backfill_chunk_id.py` | RAGAS 离线评测（`--from-db` 从 `rag_turn`+`rag_chunk`+`rag_eval_label` 库内取数 / `--file` 读标注 JSON，四项指标，缺标只跑两项）；存量 `rag_chunk.chunk_id` 回填；灰度 / 双集合切换待补；线上 `router._audit_llm_result` 保持 no-op |
 | 运营后台 | `app/api/dashboard` | 文档 / FAQ / 文件 / 配置中心 / 检索调试 / 健康 |
 | 生成 | `core/rag_generator` | LangChain LCEL 组装检索结果 → LLM |
 | 路由 | `core/qa_router` | FAQ 优先 + 意图分流 + 阈值路由 + RAG 兜底 |
@@ -193,7 +189,7 @@ RAG-Ultra/
 ├── common/                      # config.py / logger.py / response.py
 ├── dashboard/                   # (预留) 控制台前端（当前为空目录）
 ├── docs/                        # 架构/部署/鉴权/配置中心/设计方案 文档
-├── scripts/                     # gen_schema_pg.py / gen_auth_headers.py
+├── scripts/                     # gen_schema_pg.py / gen_auth_headers.py / backfill_chunk_id.py
 ├── docker/ tests/ offline/
 ├── models/                      # 模型权重（bge-m3 / bge-reranker），gitignore
 ├── requirements.txt
@@ -247,7 +243,7 @@ python run.py        # 生产：uvicorn 多 worker（WORKERS），仅 app（8800
 
 请求进入顺序（外→内）：`CORS → Trace → ApiLog → Auth → 路由`。Auth 置于最内层，验签失败仍由 Trace/ApiLog 记录，便于审计被拒调用。
 
-- **TraceMiddleware**：缺失 `X-Trace-Id` 则生成，响应头回写（全链路透传）。
+- **TraceMiddleware**：缺失 `X-Trace-Id` 则生成，响应头回写（请求级透传）。
 - **ApiLogMiddleware**：记录请求（方法/路径/身份头脱敏/query/body）+ 响应（状态/耗时/body），按 `API_LOG_EXCLUDE` 跳过探活等高噪路径；`API_LOG_DB=True` 时落 `rag_api_call_log`（一条请求一行）。底层纯 ASGI，不吃请求体，故流式响应与大文件上传不受影响。
 - **AuthSignatureMiddleware**：见 §6.3。
 
@@ -383,15 +379,15 @@ redis / postgres / milvus / model / mcp / nacos / config_center
 
 ## 10. 存储层
 
-- **PostgreSQL**（`store/orm_models` + `store/db.py`）：元数据 ORM（租户/知识库/文档/FAQ/会话等），异步 SQLAlchemy 会话池（`asyncpg` 驱动）。
-- **Milvus**（`milvus_store.py`）：`rag_chunks` 集合，dense cosine + sparse IP 双向量，partition key 做租户隔离。
+- **PostgreSQL**（`store/orm_models` + `store/db.py`）：元数据 ORM（租户/文档/FAQ/会话等），异步 SQLAlchemy 会话池（`asyncpg` 驱动）。
+- **Milvus**（`milvus_store.py`）：`rag_chunks` 集合，dense IP（L2 归一化等价于余弦，对齐 rag-pro）+ sparse IP 双向量，partition key 做租户隔离。
 - **Redis**（`redis_store.py` + `redis_keys.py`）：答案/embedding/prompt/faq 缓存、会话原文与记忆、限流令牌桶、聊天停止标记、签名 nonce 去重。key 前缀与 TTL 集中在 `redis_keys.py`，禁止散落硬编码。
 
 ---
 
 ## 11. 未实现 / 待落地（TODO）
 
-> 以下能力调用点已打通、但实现为 no-op / 原样返回（当前不会抛错、不影响主链路），尚未真正落地。
+> 以下能力调用点已接通、但实现为 no-op / 原样返回（当前不会抛错、不影响主链路），尚未真正完成。
 
 ### 11.1 问答编排占位能力（`core/qa_router/router.py`）
 
@@ -399,12 +395,23 @@ redis / postgres / milvus / model / mcp / nacos / config_center
 |---|---|---|
 | **上下文压缩** `_compress_context` | 已落地 | 按大小（字符数）配置，L0 截取 → L1 相关性精选 → L2 LLM 摘要（默认关）；按句截断、保留溯源、失败回退原样。方案见 `docs/上下文压缩设计方案.md` |
 | **会话记录持久化** `_persist_session` | 已落地 | 一轮两条（user/assistant）写 Redis 会话原文 + PostgreSQL `rag_turn`，异步不阻塞主链路、失败降级；覆盖 cache/faq/rag/empty 全部出口。方案见 `docs/会话记录持久化设计方案.md` |
-| **LLM 结果审计** `_audit_llm_result` | no-op，仅打日志 | 后续接入 **RAGAS** 评测管道统一落地，不在业务库做质量评估计算与持久化 |
+| **LLM 结果审计** `_audit_llm_result` | no-op，仅打日志 | 质量评估不在业务主链路做；**RAGAS 已以离线脚本 `offline/rag_eval.py` 落地**（`--from-db` 从 `rag_turn`+`rag_chunk`+`rag_eval_label` 捞真实检索数据跑四项指标，缺标只跑 Faithfulness/AnswerRelevancy），结果只打印不落业务库，符合"业务库不计算、不回写指标"边界 |
 
 ### 11.2 平台能力
 
-- 异步索引 Worker（Celery/ARQ 投递与幂等状态机）
-- FAQ/文档索引落库业务实现（当前部分路由为占位）
+- **索引核心链路已落地**：`core/rag_indexer/pipeline.build_index` 已完成"取字节 → 父子块切分 → 写 PostgreSQL `rag_chunk` → bge-m3 向量化 → Milvus `add_chunks` upsert"全链路，经 Redis 队列（`enqueue_index`）或进程内降级触发，`IndexManager` 消费回写状态（待解析/解析中/完成/失败）。剩余为：**独立索引 Worker 进程**（当前为同进程 + Redis 队列，Celery/ARQ 独立部署未落地）、**部分 dashboard 路由仍为占位**。
 - MinIO/OSS FileProvider 实装、分布式锁、限流令牌桶细化
-- 评测 / 灰度（与 11.1 的 RAGAS 审计衔接）
+- 评测：RAGAS 离线评测已落地（`offline/rag_eval.py`，见 11.3）；灰度待补（与 11.1 审计衔接）
 - 控制台前端（`dashboard/` 当前为空目录）
+
+### 11.3 检索链路现状与待完善（M4 检索侧）
+
+> 检索**运行时**已完整实现并接入主链路（`core/qa_router/router.py` 调用 `StrategySelector` + `QueryAugmenter` + `Retriever`）：混合召回（dense+sparse）、RRF 融合、rerank 重排（失败降级 RRF）、四选一查询增强（HyDE/子查询/回溯/DIRECT，含回退）、父子块去重+高亮、tenant_id 分区隔离。以下为检索相关已完成与待完善项：
+
+| 项 | 状态 | 说明 |
+|---|---|---|
+| **doc / 知识库级权限过滤** | ✅ 已落地 | `filters`（如 `{'doc_ids': [...]}`）已端到端透传：`router.answer/answer_stream` → `QueryAugmenter` → `Retriever.retrieve` → `MilvusStore.hybrid_search`（经 `_build_filter_expr` 下推 `doc_id in [...]`）。调用方按用户可见文档集合裁剪检索范围即可实现文档/权限级隔离。 |
+| **增量索引 + 版本失效/回滚** | ✅ 已落地（版本化重建） | `rag_chunk`/`rag_document` 增加 `version` 列；重新索引时旧版本 soft-delete（`enabled=0`）而非硬删，`chunk_id` 编入 version 使各版本主键不冲突；Milvus 侧删除旧版本向量实体、只留生效版本。回滚：`DocDao.rollback_version` 切换 PG 启用版本 + `pipeline.rollback_index_version` 重写目标版本 Milvus 实体并删当前版本；dashboard 提供 `GET /admin/docs/{doc_id}/versions` 与 `POST /admin/docs/{doc_id}/rollback`。 |
+| **检索质量离线评测** | ✅ 已落地（离线 + 库内取数） | 新增 `offline/rag_eval.py`（参考 rag-pro），支持两种数据源：① `--file` 读人工标注 JSON；② `--from-db` 从业务库捞**真实检索数据**——`rag_turn` 配对出 question/answer，`chunks_json.chunk_id` 回查 `rag_chunk.content` 还原召回正文（见 §2.2 `chunk_id` 列），`reference` 来自 `rag_eval_label` 标注侧表（缺标则只跑 Faithfulness/AnswerRelevancy）。四项 RAGAS 指标，LLM 复用线上网关、embedding 走本地 bge-m3；依赖单独环境（`offline/requirements.ragas.txt`），不进运行时 `requirements.txt`。线上 `router._audit_llm_result` 仍保持 no-op。**存量 `rag_chunk` 行迁移后 `chunk_id=0` 时**：跑 `python scripts/backfill_chunk_id.py` 按 `stable_chunk_id(tenant,doc,version,parent,seq)` 复算补齐；若某文档已被重建导致版本变化、复算值对不上 Milvus 实体，对该文档重索引即可。 |
+| **多模态 / OCR 解析** | ⬜ 待补（按规划忽略） | `document_loaders` 支持多格式加载，但扫描件 OCR、表格结构化抽取仍偏弱，本期不投入。 |
+| **独立索引 Worker 进程** | ⬜ 待补（按规划忽略） | 当前为同进程 + Redis 队列（`IndexManager` 消费），Celery/ARQ 独立进程部署未落地，本期不投入。 |

@@ -66,3 +66,16 @@ class RagTurn(Base):
         Index('idx_tenant_created', 'tenant_id', 'created_at'),
         Index('idx_created', 'created_at'),
     )
+
+
+class RagEvalLabel(Base):
+    """RAGAS 评测标注：人工/外部给出的标准答案（ground truth），与业务表解耦。
+
+    按 turn_id 关联 rag_turn；ContextPrecision / ContextRecall 必须有它，而 Faithfulness /
+    AnswerRelevancy 不需要。缺标的轮次只能跑后两项（见 offline/rag_eval.py）。
+    """
+    __tablename__ = 'rag_eval_label'
+
+    turn_id: Mapped[str] = mapped_column(String(32), primary_key=True, comment='一轮问答ID（rag_turn.turn_id）')
+    reference: Mapped[str] = mapped_column(Text, nullable=False, comment='标准答案 / ground truth')
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, comment='标注时间')

@@ -53,6 +53,10 @@ class DocRequest(BaseModel):
     doc_type: Literal[0, 1] = Field(0, description="【可选】文档类型：0=普通文档 1=FAQ 来源")
 
 
+class DocRollbackRequest(BaseModel):
+    version: int = Field(..., description="【必填】回滚到的目标版本号（来自 versions 接口）")
+
+
 class RetrieveRequest(BaseModel):
     query: NonBlank = Field(..., max_length=2000, description="【必填】检索问题")
     scope: Literal["doc", "faq"] = Field("doc", description="【可选】检索域：doc=文档 faq=问答对")

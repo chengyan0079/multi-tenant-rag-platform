@@ -7,7 +7,6 @@
 没有独立 Worker 进程：消费侧是 app/managers/index_manager（Redis 队列 BRPOP）。
 后续换 Celery/ARQ 只需替换 enqueue_index 的投递与 IndexManager 的消费，本模块不变。
 """
-import hashlib
 import json
 import os
 import shutil
@@ -19,17 +18,12 @@ from common.logger import logger
 from app.app_state import app_state
 from core.rag_indexer.document_processor import process_documents
 from store.doc_dao import DocDao
+from store.milvus_store import stable_chunk_id
 from store.redis_keys import index_queue_key
 
 
 def _ext(file_name: str) -> str:
     return os.path.splitext(file_name)[1].lower() if (file_name and '.' in file_name) else '.bin'
-
-
-def _stable_chunk_id(tenant_id: int, doc_id: int, sub_id: str, seq: int) -> int:
-    """稳定 chunk_id（INT64）：相同输入恒定，供 Milvus upsert 幂等覆盖。"""
-    raw = hashlib.md5(f'{tenant_id}:{doc_id}:{sub_id}:{seq}'.encode()).hexdigest()[:15]
-    return int(raw, 16)
 
 
 async def build_index(tenant_id: int, doc_id: int, oss_key: str, file_name: str,
@@ -63,15 +57,20 @@ async def build_index(tenant_id: int, doc_id: int, oss_key: str, file_name: str,
                 'ref_id': 0,
             })
 
-        # 落 PostgreSQL 元数据（先删后插，幂等）
-        await DocDao().save_chunks(tenant_id, doc_id, scope, chunks)
-        # 向量化 + 写 Milvus（add_chunks 内部 embed + upsert）
+        dao = DocDao()
+        # 先取下一个版本号，保证 PG 与 Milvus 主键（含 version）一致
+        version = await dao.next_version(tenant_id, doc_id)
+        old_version = version - 1
+
+        # 落 PostgreSQL 元数据：旧版本 soft-delete，新版本插入（幂等 + 可回滚）
+        await dao.save_chunks(tenant_id, doc_id, scope, chunks, version=version)
+        # 向量化 + 写 Milvus（add_chunks 内部 embed + upsert；chunk_id 含 version 互不冲突）
         store = app_state.milvus_store
         if store is None:
             raise RuntimeError('milvus_store 未初始化')
         await store.add_chunks([
             {
-                'chunk_id': _stable_chunk_id(tenant_id, doc_id, c.get('parent_id', '') + str(i), i),
+                'chunk_id': stable_chunk_id(tenant_id, doc_id, version, c.get('parent_id', ''), i),
                 'tenant_id': tenant_id,
                 'scope': scope,
                 'doc_id': doc_id,
@@ -84,6 +83,9 @@ async def build_index(tenant_id: int, doc_id: int, oss_key: str, file_name: str,
             }
             for i, c in enumerate(chunks)
         ])
+        # 清理旧版本向量实体，Milvus 只保留生效版本（回滚时由调用方重新写入目标版本）
+        old_ids = await dao.chunk_ids_of_version(tenant_id, doc_id, old_version)
+        await store.delete_by_chunk_ids(old_ids)
         return len(chunks)
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -102,6 +104,53 @@ async def run_index_job(tenant_id: int, doc_id: int, oss_key: str, file_name: st
     except Exception as e:  # noqa: BLE001
         logger.exception(f'文档索引失败 [doc_id={doc_id} tenant={tenant_id}]')
         await dao.update_status(doc_id, 3, err_msg=f'索引失败：{e}'[:512])
+
+
+async def rollback_index_version(tenant_id: int, doc_id: int, target_version: int) -> int:
+    """版本回滚：把文档检索内容恢复到指定历史版本。
+
+    步骤：先把目标版本切片重新写入 Milvus（upsert，chunk_id 含 target_version），
+    再删除当前生效版本的 Milvus 实体，最后 PG 侧切换启用版本。先增后删避免检索空窗。
+    返回目标版本启用切片数。
+    """
+    dao = DocDao()
+    store = app_state.milvus_store
+    if store is None:
+        raise RuntimeError('milvus_store 未初始化')
+
+    target_chunks = await dao.get_version_chunks(tenant_id, doc_id, target_version)
+    if not target_chunks:
+        raise ValueError(f'目标版本无切片，无法回滚: doc={doc_id} version={target_version}')
+
+    # 当前生效版本：从文档记录取（回滚前仍是它）；scope 按文档类型对齐，避免 FAQ 文档错配
+    current = await dao.get_status(doc_id)
+    current_version = current.get('version', target_version)
+    scope = 0 if current.get('doc_type', 0) == 0 else 1
+
+    # 1) 写入目标版本向量（覆盖式 upsert，不依赖是否曾删除）
+    await store.add_chunks([
+        {
+            'chunk_id': stable_chunk_id(tenant_id, doc_id, target_version, c.get('parent_id', ''), c['seq']),
+            'tenant_id': tenant_id,
+            'scope': scope,
+            'doc_id': doc_id,
+            'ref_id': 0,
+            'text': c['text'],
+            'parent_id': c.get('parent_id', ''),
+            'parent_content': c.get('parent_content', c['text']),
+            'doc_name': c.get('doc_name', ''),
+            'page': c.get('page', 0),
+        }
+        for c in target_chunks
+    ])
+    # 2) 删除当前版本向量（若与目標相同则跳过，避免自删）
+    if current_version != target_version:
+        current_ids = await dao.chunk_ids_of_version(tenant_id, doc_id, current_version)
+        await store.delete_by_chunk_ids(current_ids)
+    # 3) PG 侧切换启用版本
+    enabled = await dao.rollback_version(tenant_id, doc_id, target_version)
+    logger.info(f'索引版本回滚完成 [doc_id={doc_id} → version={target_version}, chunks={enabled}]')
+    return enabled
 
 
 async def enqueue_index(tenant_id: int, doc_id: int, oss_key: str, file_name: str,

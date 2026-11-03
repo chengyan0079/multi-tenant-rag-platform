@@ -148,6 +148,15 @@ class Config(BaseSettings):
     LLM_API_KEY:        str = Field(default='', validation_alias='OPENAI_API_KEY')
     OPENAI_API_KEY:     str = Field(default='', validation_alias='LLM_API_KEY')
 
+    # RAGAS 离线评测（详见 offline/rag_eval.py）：单独环境跑，依赖不进运行时 requirements.txt。
+    # LLM 默认复用线上网关（覆盖 .env 的 RAGAS_LLM_BASE_URL / RAGAS_LLM_MODEL 即可）；
+    # embedding 走本地 bge-m3（ollama OpenAI 兼容）更省成本。
+    RAGAS_LLM_BASE_URL:   str = 'http://localhost:8000/v1'
+    RAGAS_LLM_MODEL:      str = 'deepseek-chat'
+    RAGAS_LLM_API_KEY:    str = Field(default='', validation_alias='LLM_API_KEY')
+    RAGAS_EMBED_BASE_URL: str = 'http://localhost:11434/v1'
+    RAGAS_EMBED_MODEL:    str = 'bge-m3:latest'
+
     PARENT_CHUNK_SIZE:    int = Field(default=1200, ge=300, le=4000)
     CHILD_CHUNK_SIZE:     int = Field(default=300, ge=50, le=1000)
     PARENT_CHUNK_OVERLAP: int = Field(default=100, ge=0)

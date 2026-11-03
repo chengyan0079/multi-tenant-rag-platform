@@ -103,7 +103,7 @@ class Retriever:
         scope_int = 1 if scope == "faq" else 0
         hits = await self.store.hybrid_search(
             query=query, scope=scope_int, tenant_id=tenant_id,
-            top_k=recall_k, fusion=fusion,
+            top_k=recall_k, fusion=fusion, filters=filters,
         )
         if not hits:
             return []

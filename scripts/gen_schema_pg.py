@@ -47,6 +47,7 @@ SECTIONS = [
     ("2) 用户级表（按 user_id 隔离；rag_turn 另带 tenant_id 仅统计用）", [
         ("rag_session", "会话注册表（列表/元数据持久化；对话原文存 Redis）"),
         ("rag_turn", "问答明细（一轮两条：user/assistant；与 Redis 会话原文 1:1）"),
+        ("rag_eval_label", "RAGAS 评测标注（人工/外部标准答案），与业务表解耦，按 turn_id 关联 rag_turn"),
     ]),
     ("3) 系统级表（无 tenant_id；配置审批流，复用 Nacos）", [
         ("rag_config_change_request", "配置变更申请"),

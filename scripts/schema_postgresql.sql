@@ -32,6 +32,7 @@ CREATE TABLE rag_document (
   tenant_id BIGINT NOT NULL,
   file_upload_id BIGINT NOT NULL,
   doc_type SMALLINT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
   file_hash VARCHAR(64),
   status SMALLINT NOT NULL,
   chunk_count INTEGER NOT NULL,
@@ -45,6 +46,7 @@ COMMENT ON COLUMN rag_document.id IS '主键';
 COMMENT ON COLUMN rag_document.tenant_id IS '租户ID';
 COMMENT ON COLUMN rag_document.file_upload_id IS '来源上传记录ID（rag_file_upload.id）';
 COMMENT ON COLUMN rag_document.doc_type IS '文档类型（0=普通文档 1=FAQ来源；对应切片 scope）';
+COMMENT ON COLUMN rag_document.version IS '当前生效版本号（每次重新索引 +1，旧版本切片 soft-delete，可回滚）';
 COMMENT ON COLUMN rag_document.file_hash IS '解析时文件内容哈希快照（幂等/去重）';
 COMMENT ON COLUMN rag_document.status IS '解析状态（0=待解析 1=解析中 2=已完成 3=失败）';
 COMMENT ON COLUMN rag_document.chunk_count IS '生成切片数';
@@ -58,9 +60,11 @@ CREATE TABLE rag_chunk (
   id BIGSERIAL NOT NULL,
   tenant_id BIGINT NOT NULL,
   doc_id BIGINT NOT NULL,
+  chunk_id BIGINT NOT NULL DEFAULT 0,
   scope SMALLINT NOT NULL,
   ref_id BIGINT NOT NULL,
   seq INTEGER NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
   content TEXT NOT NULL,
   token_count INTEGER NOT NULL,
   meta JSON NOT NULL,
@@ -73,9 +77,11 @@ COMMENT ON TABLE rag_chunk IS '切片（文档/FAQ 切分后的最小检索单�
 COMMENT ON COLUMN rag_chunk.id IS '主键';
 COMMENT ON COLUMN rag_chunk.tenant_id IS '租户ID';
 COMMENT ON COLUMN rag_chunk.doc_id IS '所属解析记录ID（rag_document.id）';
+COMMENT ON COLUMN rag_chunk.chunk_id IS 'Milvus 稳定主键（stable_chunk_id）；rag_turn.chunks_json 引用它回查正文，支持答案溯源与版本对齐';
 COMMENT ON COLUMN rag_chunk.scope IS '范围（0=doc 1=faq）';
 COMMENT ON COLUMN rag_chunk.ref_id IS '关联ID（scope=1 时指向 rag_faq.id）';
 COMMENT ON COLUMN rag_chunk.seq IS '序号';
+COMMENT ON COLUMN rag_chunk.version IS '所属版本（与 rag_document.version 对齐；回滚时按版本启停）';
 COMMENT ON COLUMN rag_chunk.content IS '切片内容';
 COMMENT ON COLUMN rag_chunk.token_count IS 'token 数';
 COMMENT ON COLUMN rag_chunk.meta IS '元数据（JSON）';
@@ -83,6 +89,19 @@ COMMENT ON COLUMN rag_chunk.enabled IS '是否启用（1=启用 0=停用）';
 COMMENT ON COLUMN rag_chunk.created_at IS '创建时间';
 COMMENT ON COLUMN rag_chunk.updated_at IS '更新时间';
 CREATE INDEX idx_doc ON rag_chunk (tenant_id, doc_id);
+CREATE INDEX idx_rag_chunk_cid ON rag_chunk (chunk_id);
+
+-- 评测标注侧表：RAGAS 需要的 ground truth（标准答案）不进业务库，单独存这里，按 turn_id 关联 rag_turn
+CREATE TABLE rag_eval_label (
+  turn_id VARCHAR(32) NOT NULL,
+  reference TEXT NOT NULL,
+  created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+  PRIMARY KEY (turn_id)
+);
+COMMENT ON TABLE rag_eval_label IS 'RAGAS 评测标注（人工/外部标准答案），与业务表解耦，按 turn_id 关联 rag_turn';
+COMMENT ON COLUMN rag_eval_label.turn_id IS '一轮问答ID（rag_turn.turn_id）';
+COMMENT ON COLUMN rag_eval_label.reference IS '标准答案 / ground truth（ContextPrecision/ContextRecall 必需）';
+COMMENT ON COLUMN rag_eval_label.created_at IS '标注时间';
 
 CREATE TABLE rag_index_task (
   id BIGSERIAL NOT NULL,

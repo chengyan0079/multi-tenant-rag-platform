@@ -91,12 +91,14 @@ class QueryAugmenter:
         tenant_id: int,
         rerank: bool = True,
         scope: Literal["doc", "faq"] = "doc",
+        filters: dict[str, Any] | None = None,
     ) -> list[RetrievedChunk]:
         """按策略做检索增强并返回合并后的片段。
 
         召回 / 精排条数由 config.RECALL_K / config.RERANK_TOP_K 统一控制（不按请求传 top_k）。
+        :param filters: 业务级检索裁剪条件（如文档权限 {'doc_ids': [...]}），透传至 Milvus。
         """
-        kwargs = dict(tenant_id=tenant_id, rerank=rerank, scope=scope)
+        kwargs = dict(tenant_id=tenant_id, rerank=rerank, scope=scope, filters=filters)
         if strategy == RetrievalStrategy.DIRECT:
             result = await self.retrieve_direct(query, **kwargs)
         elif strategy == RetrievalStrategy.HYDE:

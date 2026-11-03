@@ -9,9 +9,12 @@ GET /admin/docs/{doc_id}/status 轮询状态（pending/indexing/done/failed）�
 from fastapi import APIRouter, Depends
 
 from app.api.deps import resolve_tenant
-from app.api.schemas import DocCreateResult, DocRequest, DocStatusData
+from app.api.schemas import (
+    DocCreateResult, DocRequest, DocRollbackData, DocRollbackRequest,
+    DocStatusData, DocVersionItem, DocVersionsData,
+)
 from common.response import ApiResponse, ErrCode, fail, success
-from core.rag_indexer.pipeline import enqueue_index
+from core.rag_indexer.pipeline import enqueue_index, rollback_index_version
 from store.doc_dao import DocDao
 from store.file_dao import FileDao
 
@@ -44,3 +47,28 @@ async def doc_status(doc_id: int, tenant_id: int = Depends(resolve_tenant)):
     except KeyError:
         return fail(ErrCode.NOT_FOUND, "doc not found")
     return success(DocStatusData(doc_id=doc_id, status=_status_name(st["status"])))
+
+
+@router.get("/docs/{doc_id}/versions", response_model=ApiResponse[DocVersionsData], summary="列出文档索引版本")
+async def doc_versions(doc_id: int, tenant_id: int = Depends(resolve_tenant)):
+    """列出该文档各索引版本（含历史），用于回滚选择。"""
+    try:
+        versions = await DocDao().list_versions(tenant_id, doc_id)
+    except KeyError:
+        return fail(ErrCode.NOT_FOUND, "doc not found")
+    items = [DocVersionItem(version=v["version"], chunk_count=v["chunk_count"], enabled=v["enabled"])
+             for v in versions]
+    return success(DocVersionsData(doc_id=doc_id, versions=items))
+
+
+@router.post("/docs/{doc_id}/rollback", response_model=ApiResponse[DocRollbackData], summary="回滚文档索引版本")
+async def doc_rollback(doc_id: int, req: DocRollbackRequest,
+                       tenant_id: int = Depends(resolve_tenant)):
+    """把文档检索内容回滚到指定历史版本（PG 切换启用版本 + Milvus 重写目标版本/删除当前版本）。"""
+    try:
+        enabled = await rollback_index_version(tenant_id, doc_id, req.version)
+    except ValueError as e:
+        return fail(ErrCode.BAD_REQUEST, str(e))
+    except KeyError:
+        return fail(ErrCode.NOT_FOUND, "doc not found")
+    return success(DocRollbackData(doc_id=doc_id, version=req.version, enabled=enabled))
