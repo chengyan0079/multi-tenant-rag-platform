@@ -151,4 +151,5 @@ tmp/
 mcp_demo/
 docs/
 train/
+.cw_skill/
 

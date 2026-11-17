@@ -15,6 +15,8 @@ from app.managers.redis_manager import RedisManager
 from app.managers.postgres_manager import PostgresManager
 from app.managers.faq_cache_manager import FaqCacheManager
 from app.managers.milvus_manager import MilvusManager
+from app.managers.neo4j_manager import Neo4jManager
+from app.managers.graph_build_manager import GraphBuildManager
 from app.managers.model_manager import ModelManager
 from app.managers.file_provider_manager import FileProviderManager
 from app.managers.nacos_config_manager import NacosConfigManager
@@ -33,9 +35,11 @@ def build_server() -> AppServer:
     server.register(MilvusManager(), order=55, stage=2)             # 依赖 Model（stage 在其后）
     server.register(FileProviderManager(), order=60, stage=1)       # 基础组件
     server.register(FaqCacheManager(), order=65, stage=2)           # 依赖 Redis+PostgreSQL
+    server.register(Neo4jManager(), order=70, stage=2)              # 图路侧车，GRAPH_ENABLED 时连接
     server.register(NacosConfigManager(), order=105, stage=2)       # 依赖 Redis
     server.register(NacosDiscoverManager(), order=110, stage=3)     # 服务注册
     server.register(IndexManager(), order=115, stage=3)             # 后台消费（仅起协程，不阻塞）
+    server.register(GraphBuildManager(), order=118, stage=3)        # 定时建图（依赖 Neo4j/PG）
     server.register(MCPApiManager(), order=120, stage=3)            # 需路由已挂载，最后
     return server
 

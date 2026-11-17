@@ -5,6 +5,7 @@ import shutil
 import tempfile
 from typing import Any
 
+from common.config import config
 from common.logger import logger
 
 from app.app_state import app_state
@@ -12,6 +13,30 @@ from core.rag_indexer.document_processor import process_documents
 from store.doc_dao import DocDao
 from store.milvus_store import stable_chunk_id
 from store.redis_keys import index_queue_key
+
+
+def _decode_text(data: bytes) -> str:
+    """复盘文本按配置编码顺序解码，避免 GBK 等中文文本乱码。"""
+    for enc in ('utf-8-sig', *config.CANDIDATE_ENCODINGS):
+        try:
+            return data.decode(enc)
+        except UnicodeDecodeError:
+            continue
+    return data.decode('utf-8', errors='replace')
+
+
+async def ingest_review_from_file(tenant_id: int, oss_key: str) -> None:
+    """从对象存储读取复盘文本并抽取入图；前置检查图库与文件提供者。"""
+    store = app_state.neo4j_store
+    provider = app_state.file_provider
+    if store is None or provider is None:
+        logger.warning('图库或文件提供者未就绪，跳过复盘文本入图')
+        return
+    from core.graph.ingest import ingest_review
+    data = await provider.get_bytes(oss_key, tenant_id=tenant_id)
+    result = await ingest_review(_decode_text(data), tenant_id, store)
+    logger.info(f'复盘文本入图 [tenant={tenant_id}]: '
+                f'verdict={result.verdict} nodes={result.nodes} edges={result.edges}')
 
 
 def _ext(file_name: str) -> str:
@@ -89,10 +114,17 @@ async def run_index_job(tenant_id: int, doc_id: int, oss_key: str, file_name: st
     dao = DocDao()
     try:
         await dao.update_status(doc_id, 1)
-        # doc_type 0=普通文档 1=FAQ 来源，对应切片 scope（0/1）
-        n = await build_index(tenant_id, doc_id, oss_key, file_name, scope=doc_type)
+        # doc_type 2=复盘文本，向量仍按普通文档入库（scope=0）；入图是附加动作
+        scope = 1 if doc_type == 1 else 0
+        n = await build_index(tenant_id, doc_id, oss_key, file_name, scope=scope)
         await dao.update_status(doc_id, 2, chunk_count=n)
         logger.info(f'文档索引完成 [doc_id={doc_id} tenant={tenant_id} chunks={n}]')
+        # 复盘文本入图：独立兜底，失败只告警，不改变已完成的索引状态
+        if doc_type == 2 and config.GRAPH_INGEST_ENABLED:
+            try:
+                await ingest_review_from_file(tenant_id, oss_key)
+            except Exception:  # noqa: BLE001
+                logger.exception(f'复盘文本入图失败 [doc_id={doc_id} tenant={tenant_id}]')
     except Exception as e:  # noqa: BLE001
         logger.exception(f'文档索引失败 [doc_id={doc_id} tenant={tenant_id}]')
         await dao.update_status(doc_id, 3, err_msg=f'索引失败：{e}'[:512])
@@ -117,7 +149,7 @@ async def rollback_index_version(tenant_id: int, doc_id: int, target_version: in
     # 当前生效版本：从文档记录取（回滚前仍是它）；scope 按文档类型对齐，避免 FAQ 文档错配
     current = await dao.get_status(doc_id)
     current_version = current.get('version', target_version)
-    scope = 0 if current.get('doc_type', 0) == 0 else 1
+    scope = 1 if current.get('doc_type', 0) == 1 else 0
 
     # 1) 写入目标版本向量（覆盖式 upsert，不依赖是否曾删除）
     await store.add_chunks([

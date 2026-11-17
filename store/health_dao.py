@@ -7,8 +7,16 @@
 启动/运行时维护状态，这里只做汇总。
 """
 from app.app_state import app_state
-from store.postgres_store import ping as db_ping
-from store.redis_store import ping as redis_ping
+
+# 探活依赖惰性导入：避免仅 import health_dao 就拉起 sqlalchemy/redis（离线环境可能缺失）
+def _db_ping():
+    from store.postgres_store import ping
+    return ping()
+
+
+def _redis_ping():
+    from store.redis_store import ping
+    return ping()
 
 
 def _mcp_ok() -> bool:
@@ -28,6 +36,11 @@ def _config_center_ok() -> bool:
     return loader is not None and bool(getattr(loader, 'is_started', False))
 
 
+def _graph_ok() -> bool:
+    """故障图谱是否就绪：Neo4jManager 连接成功后注入 store（图是侧车，不影响 status）。"""
+    return app_state.neo4j_store is not None and app_state.neo4j_store.driver is not None
+
+
 class HealthDao:
     async def check(self) -> dict:
         milvus_ok = False
@@ -38,11 +51,12 @@ class HealthDao:
         except Exception:  # noqa: BLE001  探活失败不影响整体，置 False
             milvus_ok = False
         return {
-            "redis": await redis_ping(),
-            "postgres": await db_ping(),
+            "redis": await _redis_ping(),
+            "postgres": await _db_ping(),
             "milvus": bool(milvus_ok),
             "model": app_state.model_service is not None,
             "mcp": _mcp_ok(),
             "nacos": _nacos_ok(),
             "config_center": _config_center_ok(),
+            "graph": _graph_ok(),
         }

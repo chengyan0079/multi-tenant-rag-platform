@@ -16,6 +16,7 @@ redis
 pymilvus
 milvus-model
 minio
+neo4j
 
 # --- FAQ 模糊匹配（BM25：jieba 分词 + rank_bm25；缺失则退化为仅精确匹配）---
 jieba

@@ -2,6 +2,8 @@
 
 FAQ 命中不调大模型；专业咨询走 RAG，通用知识空上下文直答；检索条数由
 config.RECALL_K / RERANK_TOP_K 统一控制。质量评估交离线 RAGAS（offline/rag_eval.py）。
+图路为侧车：GRAPH_ENABLED=true 且关键词命中时才融合图证据（source=graph_fused），
+图路空/超时一律退化为纯向量，与现状等价。
 """
 import asyncio
 import random
@@ -41,6 +43,32 @@ class QARouter:
         self.session_store = self.session_service.store
         self._turn_tasks: set[asyncio.Task] = set()   # 持有异步落库 task 引用，避免被 GC
 
+    async def _try_graph(
+        self, query: str, tenant_id: int, intent: str,
+        rag_hits: list[RetrievedChunk],
+    ) -> tuple[list[RetrievedChunk], bool]:
+        """图路侧车：命中则融合图证据与向量候选，返回 (chunks, 是否图路生效)。
+
+        惰性导入避免 GRAPH_ENABLED=false 时拉起 neo4j 依赖；任何异常都退回原向量结果。
+        """
+        from core.graph.fusion import graph_fused_retrieve
+        from core.graph.query import graph_search
+        from core.graph.render import render_evidence
+        from core.graph.router import build_query_params, should_use_graph
+
+        qtype = should_use_graph(query, intent, faq_hit=False)  # 调用前已确认 FAQ 未命中
+        if not qtype or app_state.neo4j_store is None:
+            return rag_hits, False
+        fused = await graph_fused_retrieve(
+            query, tenant_id, qtype, build_query_params(qtype, query),
+            rag_hits, app_state.model_service,
+            lambda qt, tid, **kw: graph_search(qt, app_state.neo4j_store, tid, **kw),
+            render_evidence,
+        )
+        if fused:
+            return fused, True
+        return rag_hits, False
+
     async def answer(
         self,
         query: str,
@@ -51,7 +79,7 @@ class QARouter:
     ) -> dict[str, Any]:
         """问答主流程，返回 {answer, source, chunks, session_id, intent}。
 
-        source 取值：cache / faq / rag / empty。
+        source 取值：cache / faq / rag / graph_fused / empty。
         """
         if not query or not query.strip():
             return {'answer': '', 'source': 'empty', 'chunks': [], 'session_id': session_id, 'intent': '通用知识'}
@@ -85,6 +113,7 @@ class QARouter:
 
         # 3) 意图分流 + 检索增强
         strategy: RetrievalStrategy | None = None
+        graph_used = False
         if intent == '通用知识':
             # 通用知识：空上下文交由大模型用自身知识直答（不检索、不因无库命中而拒绝）
             rag_hits: list[RetrievedChunk] = []
@@ -93,6 +122,8 @@ class QARouter:
             strategy = await self.strategy_selector.select_strategy(query)
             rag_hits = await self.augmenter.augment_and_retrieve(
                 query, strategy, tenant_id=tenant_id, filters=filters)
+            # 3.5) 图路侧车：关键词命中且图库可用时融合图证据；空/超时自动退化为纯向量
+            rag_hits, graph_used = await self._try_graph(query, tenant_id, intent, rag_hits)
             if not rag_hits:
                 await self._persist_session(query, '抱歉，未找到答案！', session_id, intent, user_id,
                                             meta={'turn_id': turn_id, 'source': 'empty',
@@ -108,8 +139,9 @@ class QARouter:
         answer = await self.generator.generate(query=query, chunks=rag_hits, session_id=session_id, user_id=user_id)
         # 6) 审计（后续接入 RAGAS 评测管道）+ 问答明细落库
         await self._audit_llm_result(query, answer, rag_hits, None, user_id)
+        source = 'graph_fused' if graph_used else 'rag'
         await self._persist_session(query, answer, session_id, intent, user_id, meta={
-            'turn_id': turn_id, 'source': 'rag', 'tenant_id': tenant_id,
+            'turn_id': turn_id, 'source': source, 'tenant_id': tenant_id,
             'strategy': strategy.value if strategy else None,
             'model': config.LLM_MODEL_NAME, 'chunks': rag_hits,
             'compress_method': compress_result.method,
@@ -119,7 +151,7 @@ class QARouter:
         await set_answer(tenant_id, query, answer)
         return {
             'answer': answer,
-            'source': 'rag',
+            'source': source,
             'intent': intent,
             'chunks': [{'content': c.content, 'doc_name': c.doc_name, 'page': c.page,
                         'score': c.rerank_score} for c in rag_hits],
@@ -185,12 +217,15 @@ class QARouter:
 
         # 3) 意图分流 + 检索增强
         strategy: RetrievalStrategy | None = None
+        graph_used = False
         if intent == '通用知识':
             rag_hits: list[RetrievedChunk] = []  # 空上下文，交由大模型用自身知识直答
         else:
             strategy = await self.strategy_selector.select_strategy(query)
             rag_hits = await self.augmenter.augment_and_retrieve(
                 query, strategy, tenant_id=tenant_id, filters=filters)
+            # 3.5) 图路侧车：关键词命中且图库可用时融合图证据；空/超时自动退化为纯向量
+            rag_hits, graph_used = await self._try_graph(query, tenant_id, intent, rag_hits)
             if not rag_hits:
                 # 专业咨询检索无命中：不生成，直接回复"未找到"
                 await self._persist_session(query, '抱歉，未找到答案！', session_id, intent, user_id,
@@ -211,7 +246,8 @@ class QARouter:
             {'content': c.content, 'doc_name': c.doc_name, 'page': c.page, 'score': c.rerank_score}
             for c in rag_hits
         ]
-        yield ("meta", {"source": "rag", "intent": intent, "session_id": session_id,
+        source = 'graph_fused' if graph_used else 'rag'
+        yield ("meta", {"source": source, "intent": intent, "session_id": session_id,
                         "chunks": chunks_meta, "compress": compress_result.to_dict()})
 
         # 5) 流式生成：逐 token 产出，并累计完整答案用于缓存
@@ -226,7 +262,7 @@ class QARouter:
         full_answer = "".join(full_parts)
         await self._audit_llm_result(query, full_answer, rag_hits, strategy, user_id)
         await self._persist_session(query, full_answer, session_id, intent, user_id, meta={
-            'turn_id': turn_id, 'source': 'rag', 'tenant_id': tenant_id,
+            'turn_id': turn_id, 'source': source, 'tenant_id': tenant_id,
             'strategy': strategy.value if strategy else None,
             'model': config.LLM_MODEL_NAME, 'chunks': rag_hits,
             'compress_method': compress_result.method,

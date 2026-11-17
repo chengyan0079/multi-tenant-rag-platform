@@ -50,7 +50,7 @@ class FaqRequest(BaseModel):
 
 class DocRequest(BaseModel):
     file_id: int = Field(..., description="【必填】上传后得到的文档ID（rag_file.id）")
-    doc_type: Literal[0, 1] = Field(0, description="【可选】文档类型：0=普通文档 1=FAQ 来源")
+    doc_type: Literal[0, 1, 2] = Field(0, description="【可选】文档类型：0=普通文档 1=FAQ 来源 2=故障复盘文本（自动入图）")
 
 
 class DocRollbackRequest(BaseModel):
@@ -93,5 +93,5 @@ class RollbackIn(BaseModel):
 
 __all__ = [
     "ChatRequest", "StopRequest", "TurnRequest", "SessionPatch", "FaqRequest", "DocRequest",
-    "RetrieveRequest", "CreateRequestIn", "ReviewIn", "RollbackIn",
+    "DocRollbackRequest", "RetrieveRequest", "CreateRequestIn", "ReviewIn", "RollbackIn",
 ]

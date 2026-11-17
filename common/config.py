@@ -102,6 +102,21 @@ class Config(BaseSettings):
     MILVUS_DB_NAME:  str = 'rag_ultra'
     MILVUS_COLLECTION: str = 'rag_chunks'
 
+    # 故障图谱（GraphRAG 侧车）：离线建图 + 在线图检索，默认关闭，独立接口跑通后再接主链路
+    NEO4J_URI:           str = 'bolt://localhost:7687'
+    NEO4J_USER:          str = 'neo4j'
+    NEO4J_PASSWORD:      str = ''
+    GRAPH_ENABLED:       bool = True    # 主链路是否启用图路；false 时 qa_router 行为与现状一致
+    GRAPH_MAX_EVIDENCE:  int = 24        # 图路单请求候选上限（3 条链 × 每链 ≤8 条证据）
+    GRAPH_QUERY_TIMEOUT: float = 0.8     # 图路超时（秒），超时退化为纯向量
+    GRAPH_INGEST_ENABLED: bool = True    # 上传复盘文本（doc_type=2）后是否自动入图
+    GRAPH_SCHEDULE_ENABLED: bool = True  # 是否启用定时结构化建图
+    GRAPH_SCHEDULE_INTERVAL_SEC: int = 3600  # 定时建图周期（秒）
+
+    # 故障要素抽取模型（vLLM OpenAI 兼容，离线建图用；地址与模型名配置化）
+    VLLM_BASE_URL:       str = ''        # 如 http://127.0.0.1:8100/v1
+    VLLM_EXTRACT_MODEL:  str = ''        # 如 qwen2.5-merged-1117
+
     # 文本加载时的备用编码降级顺序：优先编码解码失败后，依次尝试以下编码
     CANDIDATE_ENCODINGS: list[str] = ['utf-8-sig', 'gbk', 'gb2312', 'gb18030', 'big5']
 
