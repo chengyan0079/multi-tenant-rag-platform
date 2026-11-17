@@ -1,12 +1,7 @@
-"""检索调试（dashboard，admin，SSE 流式）（§17.8）
+"""检索调试接口（运营后台，admin，SSE 流式）。
 
-裸混合检索接口，返回原始召回片段，供运营/运维排查召回质量；不进入生成链路。
-非端用户接口，由后台 admin 角色调用（与文件/FAQ/配置同属 dashboard 包）。
-
-SSE 事件协议（data 均为 JSON 字符串）：
-- meta ：{"query","scope","top_k","total"}
-- chunk：单个召回片段（chunk_id/content/doc_name/page/score/parent_id）
-- done  ：结束
+裸混合检索，返回原始召回片段（含分数/父块），供运营排查召回质量，不进入生成链路。
+SSE 事件：meta（查询参数）/ chunk（单片段）/ done。
 """
 import json
 

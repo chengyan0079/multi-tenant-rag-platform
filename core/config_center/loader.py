@@ -1,16 +1,4 @@
-"""loader - 配置中心热加载（P1）
-
-业务侧从 Nacos 配置中心（namespace=rag-ultra）读取配置，并监听变更热更新到本地缓存。
-与控制台"直连 Nacos 查询"（core.config_center.nacos_config，requests + Open API）不同，
-本 loader 用 **SDK 的 gRPC 长连接**订阅变更，避免轮询。
-
-适配 **Nacos Server 3.x + nacos-sdk-python 2.0+**（`v2.nacos`，全异步）：
-  - 客户端：`ClientConfig` + `await NacosConfigService.create_config_service(...)`
-  - 读取：`await get_config(ConfigParam(data_id=..., group=...))`
-  - 监听：`await add_listener(data_id, group, listener)`，listener 为 async，
-    签名 `(tenant, group, data_id, content)`
-故本 loader 的对外方法也相应改为 async。
-"""
+"""配置中心热加载：用 nacos-sdk gRPC 长连接订阅 Nacos 变更，热更新本地缓存（区别于直连查询）。适配 Nacos 3.x + sdk 2.0+，对外方法为 async。"""
 import asyncio
 import json
 from typing import Callable, Optional

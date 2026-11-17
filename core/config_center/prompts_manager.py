@@ -1,16 +1,4 @@
-"""
-prompts_manager - RAG 提示词管理器（正式模块）
-
-设计：
-1. 把提示词工程与业务编排逻辑剥离（集中调优 / A/B 测试只改这里或 Nacos 里的配置）。
-2. 取提示词走 "先 Redis 再 Nacos"：运行时优先命中 Redis 缓存，未命中回源 Nacos 配置中心
-   （PROMPT 组，namespace=rag-ultra），回源成功回填 Redis。详见 core.config_center.prompts_cache。
-
-提示词本体存于 Nacos 配置中心 PROMPT 组，data_id 即下方常量名：
-  CORE_RAG_TEMPLATE / HYDE_GENERATION_TEMPLATE / SUBQ_GENERATION_TEMPLATE / BACK_GENERATION_TEMPLATE
-  / STRATEGY_SELECT_TEMPLATE
-本模块只负责按 data_id 取内容并构建 LangChain PromptTemplate，供生成层 / 检索层等业务调用。
-"""
+"""RAG 提示词管理器：取词走"先 Redis 后 Nacos"，按 data_id 取内容构建 PromptTemplate，供生成/检索层调用。本体在 Nacos PROMPT 组。"""
 from typing import Any
 
 from common.config import config

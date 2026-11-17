@@ -1,9 +1,4 @@
-"""PostgresManager（order=30）：校验 PostgreSQL 连通且目标库可用，不自动建表（生产建表由 Alembic 迁移负责）。
-
-库可用性校验采用"直接连目标库探测"：连得上即可用；不通再按 sqlstate 区分
-（3D000=库不存在 / 其它=连不上或无权限）。不查 information_schema——非 superuser 可能因无权限
-看不到库而误判"不存在"，且对"该用户能否使用此库"这一真实诉求是间接的。
-"""
+"""PostgresManager（order=30）：校验 PG 连通且目标库可用，不自动建表（建表由 Alembic 负责）。连不通按 sqlstate 区分 3D000=库不存在/其它=连不上无权限；不查 information_schema 以免非 superuser 误判。"""
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 

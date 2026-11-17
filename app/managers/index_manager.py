@@ -1,8 +1,4 @@
-"""IndexManager（stage 3）：消费文档索引任务队列（Redis BRPOP）。
-
-启动即消费 Redis 队列积压任务，并扫描 rag_document.status=0 的残留（上轮崩溃未消费）
-重新入队，保证索引最终完成。无 Redis 时不启动消费者（调用方降级为进程内 create_task）。
-"""
+"""IndexManager（stage 3）：Redis BRPOP 消费索引任务；启动扫描 status=0 残留重新入队保证最终完成；无 Redis 时不启动（降级进程内 create_task）。"""
 import asyncio
 import json
 

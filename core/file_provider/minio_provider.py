@@ -1,12 +1,4 @@
-"""
-minio_provider - MinIO 文件提供者
-
-对接 config.MINIO_*：endpoint / bucket / access_key / secret_key。
-minio 官方 SDK 为同步阻塞，所有网络 IO 用 asyncio.to_thread 包一层，避免阻塞事件循环。
-对象路径与租户前缀由 core.file_provider.provider 统一构造（_build_object_key / _tenant_prefix），
-与 Mock 等实现保持一致，便于多服务通用。
-接口层 url 统一走本服务 /admin/files/{oss_key} 中转。
-"""
+"""MinIO 文件提供者：对接 config.MINIO_*；同步 SDK 的 IO 用 asyncio.to_thread 包裹避免阻塞事件循环；对象路径/租户前缀由 provider 模块统一构造。下载 url 走本服务 /admin/files/{oss_key} 中转。"""
 import asyncio
 import base64
 import os

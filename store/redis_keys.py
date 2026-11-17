@@ -1,15 +1,4 @@
-"""
-redis_keys - Redis 键前缀与有效期（TTL）集中管理（store 数据访问层）
-
-所有写入 Redis 的 key 必须经由本模块构造，统一加前缀并设置有效期，
-避免键冲突与无限期堆积。store 内部（redis_store）与各业务域
-（core/session、core/session_memory、core/config_center/prompts_cache 等）均从这里取前缀与 TTL，
-禁止在各自文件里硬编码。
-
-约定（与既有缓存 key 兼容，不做破坏性改名）：
-  - 平台级配置（无租户）：rag:prompt:<data_id>
-  - 多租户业务：        t:<tenant_id>:<domain>:<rest>
-"""
+"""Redis 键前缀与 TTL 集中管理：所有写 Redis 的 key 必须经由本模块构造（统一前缀+有效期），禁止硬编码。平台级 rag:prompt:<data_id>；多租户 t:<tenant_id>:<domain>:<rest>。"""
 from typing import Final
 
 from common.config import config

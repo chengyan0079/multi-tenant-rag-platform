@@ -1,9 +1,4 @@
-"""
-retriever - 检索编排
-
-实现"父子块去重 + 高亮"，封装为设计文档 §6.3 的 Retriever。
-支持 scope(doc/faq)、RRF 融合、Rerank 重排；Rerank 失败时退回只用 RRF 的结果。
-"""
+"""检索编排：父子块去重 + 高亮，支持 scope(doc/faq)、RRF 融合、Rerank 重排（失败降级 RRF）。"""
 from dataclasses import dataclass, field
 from typing import Any, Literal
 

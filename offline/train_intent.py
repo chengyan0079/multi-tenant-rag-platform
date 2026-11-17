@@ -1,12 +1,4 @@
-"""
-train_intent - 离线意图分类模型训练与评估（不属在线运行时）
-
-数据格式：JSONL，每行 {"query": str, "label": "通用知识"|"专业咨询"}。
-产出：微调后的 BERT 分类模型，落到 config.BERT_INTENT_DIR，供 core.intent 推理加载。
-本脚本是离线流程，项目在线服务不参与训练/评估，仅消费其产出。
-
-运行：python offline/train_intent.py
-"""
+"""离线意图分类训练与评估（不属在线运行时）：JSONL 数据微调 BERT 二分类，产物落到 BERT_INTENT_DIR 供 core.intent 推理。运行 python offline/train_intent.py。"""
 import json
 import os
 

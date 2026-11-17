@@ -1,11 +1,4 @@
-# [运营后台 dashboard 接口]
-"""文档（索引）（§17.4）
-
-流程：POST /admin/docs（传上传得到的 file_id）→ 落 rag_document(status=0) →
-投递索引任务（Redis 队列，由 app/managers/index_manager 消费）→ 后台完成切分 + 向量化建库；
-GET /admin/docs/{doc_id}/status 轮询状态（pending/indexing/done/failed）。
-数据访问在 store.doc_dao.DocDao / store.file_dao.FileDao；本路由只做 HTTP 编排 + 响应组装。
-"""
+"""文档索引接口（运营后台）。POST 落记录 + 投递异步索引任务，GET 轮询状态/版本，支持版本回滚。"""
 from fastapi import APIRouter, Depends
 
 from app.api.deps import resolve_tenant

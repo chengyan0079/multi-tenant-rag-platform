@@ -1,12 +1,4 @@
-"""rag_indexer.pipeline - 单文档索引聚合入口（把现有组件串成"加载→切分→落库"）。
-
-流程：取对象字节 → 落临时目录 → 父子块切分（复用 document_processor.process_documents）
-→ 组装 chunk dict → 写 PostgreSQL rag_chunk（DocDao.save_chunks）→ 向量化 + 写 Milvus
-（MilvusStore.add_chunks，内部 embed + upsert）。索引状态回写由 run_index_job 统一处理。
-
-没有独立 Worker 进程：消费侧是 app/managers/index_manager（Redis 队列 BRPOP）。
-后续换 Celery/ARQ 只需替换 enqueue_index 的投递与 IndexManager 的消费，本模块不变。
-"""
+"""单文档索引聚合入口：取对象字节 → 落临时目录 → 父子块切分 → 写 PG(rag_chunk) → 向量化写 Milvus；状态回写由 run_index_job 处理。消费侧为 index_manager（Redis 队列），换 Celery/ARQ 只替换投递与消费。"""
 import json
 import os
 import shutil

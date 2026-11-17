@@ -1,14 +1,4 @@
-"""
-strategy_selector - 检索策略路由（LLM 零样本分类）
-
-在"专业咨询"分支内，决定用哪种检索增强方式：
-  DIRECT    直接检索（原问题）
-  HYDE      假设性文档嵌入检索（先生成假设答案再检索）
-  SUB_QUERY 子查询检索（拆多个子问题分别检索后合并）
-  BACKTRACK 回溯问题检索（把复杂长问题抽象为核心问题再检索）
-
-依赖大模型做零样本分类；分类失败/返回非法值统一降级为 DIRECT。
-"""
+"""检索策略路由：LLM 零样本分类选 DIRECT/HYDE/SUB_QUERY/BACKTRACK，失败降级 DIRECT。"""
 from enum import Enum
 
 from common.config import config

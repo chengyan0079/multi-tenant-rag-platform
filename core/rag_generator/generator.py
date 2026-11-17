@@ -1,8 +1,6 @@
-"""
-generator - 生成层
+"""生成层：检索结果 → Prompt → 大模型（OpenAI 兼容网关），支持多轮历史拼接与流式输出。
 
-把检索结果拼成上下文，交给 LangChain 组装成调用大模型的链。
-大模型走平台 LLM 网关（OpenAI 兼容接口）。支持多轮历史拼接。
+提示词本体在 Nacos PROMPT 组（CORE_RAG_TEMPLATE），不可达时回退内置兜底模板。
 """
 import asyncio
 from typing import Any
@@ -101,7 +99,7 @@ class Generator:
         """取历史与记忆，按分层配额装配成"记忆 / 历史 / 当前问题"三段文本。
 
         检索片段（P0）不在这里裁剪，只把它的字符数计入配额，
-        这样记忆和历史再长也挤不掉证据（设计方案 §4.2）。
+        这样记忆和历史再长也挤不掉证据。
         """
         if history is None and session_id and user_id:
             history = await self.conv_store.get_history(

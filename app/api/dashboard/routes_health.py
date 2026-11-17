@@ -1,8 +1,4 @@
-# [运营后台 dashboard 接口]
-"""健康 / 运维（§17.7）
-
-探活聚合在 store.health_dao.HealthDao；本路由只做 HTTP 编排 + 响应组装。
-"""
+"""健康检查接口（探活，供 Nacos 调用）。"""
 from fastapi import APIRouter
 
 from app.api.schemas import HealthData

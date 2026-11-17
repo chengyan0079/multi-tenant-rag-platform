@@ -1,9 +1,4 @@
-"""
-mock_provider - Mock 文件提供者（本地临时区，作为无对象存储环境兜底）
-
-对象路径与租户前缀由 core.file_provider.provider 统一构造（_build_object_key / _tenant_prefix），
-与 MinIO 等实现一致，确保多服务通用时路径格式统一。
-"""
+"""Mock 文件提供者（本地临时目录兜底，无对象存储环境用）。对象路径/租户前缀由 provider 模块统一构造。"""
 import base64
 import os
 from datetime import datetime, timedelta

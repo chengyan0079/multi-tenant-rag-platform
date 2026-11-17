@@ -1,8 +1,6 @@
-# [运营后台 dashboard 接口]
 """配置中心变更接口（审批流，不直接写 Nacos）。
 
-变更须经 申请 → 复核 →（后端 ConfigChangeService 代理）执行 Nacos 写。
-查询类接口见 routes_config_read。请求体 / 响应 data 结构统一见 app.api.schemas。
+变更须经 申请 → 复核 → 执行 三步，由 ConfigChangeService 代理写 Nacos；查询见 routes_config_read。
 """
 from fastapi import APIRouter, Depends
 

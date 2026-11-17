@@ -1,8 +1,4 @@
-"""
-loader_markdown - Markdown 加载器
-
-Author: 骆昊
-"""
+"""Markdown 加载器（保留原始标记语法）。"""
 import hashlib
 import re
 from pathlib import Path
@@ -21,7 +17,7 @@ def _strip_front_matter(text: str) -> str:
 
 
 class FastMarkdownLoader(BaseLoader):
-    """高性能纯文本 Markdown 加载器（保留原始标记语法）"""
+    """Markdown 加载器（保留原始标记语法）"""
 
     def __init__(self, file_path: str, remove_front_matter: bool = True):
         self.file_path = Path(file_path).resolve()

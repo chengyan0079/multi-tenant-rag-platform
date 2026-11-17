@@ -1,12 +1,4 @@
-"""
-query - 配置中心只读查询封装（按 group 维度）
-
-业务侧 / 控制台统一从这里取配置，底层都是调用 Nacos Open API（core.config_center.nacos_config）。
-
-设计约定：配置按 group 组织（如 SYSTEM=系统级、PROMPT=提示词），但本模块只做
-**通用、group 参数化**的抽象——group 只是入参，代码中不按 group 特判，所有 group 走同一套逻辑。
-group 建议传 `core.config_center.groups.ConfigGroup` 枚举成员（str 枚举，底层即字符串）。
-"""
+"""配置中心只读查询封装（按 group 维度，group 参数化不特判）。底层统一调 Nacos Open API。"""
 import json
 from typing import Any
 

@@ -1,8 +1,4 @@
-"""postgres_store - PostgreSQL 异步连接与会话（M3 元数据）
-
-引擎与连接池由 AppServer 的 PostgresManager 创建并注入 app_state.db_engine；
-本模块提供会话工厂与查询辅助。生产环境建议改用 Alembic 迁移。
-"""
+"""PostgreSQL 异步连接与会话：引擎/连接池由 PostgresManager 注入 app_state.db_engine；本模块提供会话工厂与查询辅助。"""
 from typing import AsyncGenerator
 
 from sqlalchemy import text

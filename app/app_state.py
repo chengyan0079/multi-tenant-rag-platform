@@ -1,9 +1,4 @@
-"""
-app_state - 全局共享状态与请求上下文
-
-启动期注入：settings / redis / engine / milvus_store / model / file_provider / app。
-请求期（contextvars）：tenant_id / user_id / trace_id，由 M1 依赖注入透传。
-"""
+"""全局共享状态：启动期注入 settings/redis/engine/milvus_store/model/file_provider/app；请求期 contextvars 透传 tenant_id/user_id/trace_id。"""
 from __future__ import annotations
 
 import contextvars

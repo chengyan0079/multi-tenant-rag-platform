@@ -1,18 +1,4 @@
-"""
-main - 服务入口
-
-组合 AppServer（注册各启动项 Manager）后，由 uvicorn 以 workers 多进程方式拉起 FastAPI；
-每个 worker 在 lifespan 内独立初始化自己的资源（Windows spawn 安全）。
-优雅关闭由 uvicorn 统一处理（SIGINT/SIGTERM + timeout_graceful_shutdown）。
-
-启动成功后默认指向并自检健康接口 /admin/health（见 routes_health）：serve 起来后并发轮询，
-就绪即打印健康结果，便于确认服务可用（供 nacos 探活/运维观测）。
-
-运行：
-  python run.py         # 生产（main，多 worker）
-  python app/main.py    # 开发（main_dev，单 worker + 热重载）
-基础设施 MCP（mcp_demo/server.py）不走项目启动器，按 docs/部署说明.md 用脚本单独启动。
-"""
+"""服务入口：组合 AppServer 后由 uvicorn 以 workers 多进程拉起 FastAPI（Windows spawn 安全），优雅关闭由 uvicorn 处理；启动后自检 /admin/health。运行：python run.py（生产多 worker）/ python app/main.py（开发单 worker 热重载）。"""
 import asyncio
 import urllib.request
 from pathlib import Path

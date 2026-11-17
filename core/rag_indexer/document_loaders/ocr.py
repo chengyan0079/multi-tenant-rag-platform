@@ -1,10 +1,4 @@
-"""
-ocr - 光学文字识别模块
-
-说明：使用 functools.lru_cache 实现单例模式，避免内存中重复加载模型权重造成 OOM。
-
-Author: 骆昊
-"""
+"""OCR 模块：用 lru_cache 单例加载 RapidOCR，避免重复加载权重导致 OOM。"""
 from functools import lru_cache
 
 from common.logger import logger

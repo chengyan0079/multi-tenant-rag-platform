@@ -1,21 +1,4 @@
-"""回填 rag_chunk.chunk_id（迁移前默认 0 的历史行）。
-
-背景：`rag_chunk` 新增 `chunk_id` 列（= Milvus 稳定主键 stable_chunk_id）后，存量行因 ALTER
-拿到默认值 0。离线评测 `offline/rag_eval.py` 靠它从 `chunks_json.chunk_id` 回查正文，
-因此需把历史行的 chunk_id 复算补齐，否则这些轮次的 retrieved_contexts 会落空。
-
-复算公式与写入时一致：stable_chunk_id(tenant_id, doc_id, version, parent_id, seq)，
-其中 parent_id 取自 meta JSON。幂等：只处理 chunk_id = 0 的行。
-
-若某文档已被重建（版本变化），复算值可能无法匹配 Milvus 中当前实体——此时该文档重索引即可
-（重索引会按新版本重新落正确 chunk_id）。
-
-用法：
-  python scripts/backfill_chunk_id.py                 # 全量回填
-  python scripts/backfill_chunk_id.py --tenant 7      # 只回填某租户
-  python scripts/backfill_chunk_id.py --dry-run       # 只统计，不写库
-  python scripts/backfill_chunk_id.py --batch 500     # 控制每批行数
-"""
+"""回填 rag_chunk.chunk_id 历史行（新增列前默认 0）。按 stable_chunk_id(tenant_id,doc_id,version,parent_id,seq) 复算，幂等只处理 chunk_id=0；文档已重建则重索引即可。支持 --tenant/--dry-run/--batch。"""
 import argparse
 import asyncio
 

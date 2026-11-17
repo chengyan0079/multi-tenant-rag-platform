@@ -1,11 +1,4 @@
-"""
-config2 - 配置类（更好的版本）
-
-说明：推荐使用 Pydantic Settings 彻底替代 configparser。它提供自动类型校验、环境变量自动映射及默认值约束。
-
-Author: 骆昊
-Version: 0.0.1
-"""
+"""全局配置：Pydantic Settings，自动类型校验 + 环境变量映射 + .env 覆盖。"""
 from pathlib import Path
 from typing import Annotated
 
@@ -46,7 +39,7 @@ class Config(BaseSettings):
     SUBQUERY_MAX:          int = Field(default=3, ge=1)             # 子查询拆分最大条数
     STRATEGY_SELECT_ENABLED: bool = True                            # 是否启用 LLM 检索策略路由（关闭则专业咨询也走直接检索）
 
-    # 问答明细落库（详见 docs/会话记录持久化设计方案.md）
+    # 问答明细落库
     QA_PERSIST_ENABLED:         bool = True    # 总开关；false 时 _persist_session 直接返回（保持 no-op 行为）
     QA_PERSIST_ASYNC:           bool = True    # 异步落库；false 走同步 await（单测/排障用）
     QA_PERSIST_MAX_TURNS:       int = 400      # Redis LIST 单会话保留的消息条数（一轮 2 条），超出 LTRIM
@@ -54,7 +47,7 @@ class Config(BaseSettings):
     QA_PERSIST_CHUNK_FULLTEXT:  bool = False   # chunks 是否附带片段全文；默认只存引用（doc_name/page/score）
     QA_EVAL_SAMPLE_RATE:        float = Field(default=0.05, ge=0.0, le=1.0)  # 评测采样率，命中时 rag_turn.eval_flag=1
 
-    # 上下文装配与压缩（按字符数配置，非 token；详见 docs/上下文压缩设计方案.md）
+    # 上下文装配与压缩（按字符数配置，非 token）
     # 多轮装配侧：记忆 / 历史注入上限
     HISTORY_MAX_MESSAGES: int = Field(default=6, ge=0)   # 注入 prompt 的历史消息条数（替代 get_history 写死的 last=6）
     MEMORY_MAX_CHARS:     int = Field(default=2000, ge=0)  # 记忆注入文本字符上限，超限按句截断

@@ -1,17 +1,4 @@
-"""
-app_factory - FastAPI 应用工厂（uvicorn factory 模式，多进程安全）
-
-每个 worker 进程各自调用 create_app()：构建 AppServer、按 stage 注册各启动项 Manager、
-挂载路由，并在 lifespan 内按阶段启动 / 逆序释放这些 Manager（任一失败即记 "启动失败" 日志）。
-
-启动分 stage（同 stage 内 asyncio.gather 并发，stage 间按序）：
-  stage 0：Logging（奠基）
-  stage 1：Redis / PostgreSQL / Model / FileProvider（相互独立，并发）
-  stage 2：Milvus(依赖 Model) / FaqCache(依赖 Redis+PostgreSQL) / NacosConfig(依赖 Redis)
-  stage 3：NacosDiscover（服务注册，最后）
-
-配置为 common.config 单例，已由 app_state.settings 暴露，无需单独 ConfigManager。
-"""
+"""FastAPI 应用工厂（uvicorn factory 模式，多进程安全）。每个 worker 调 create_app()：构建 AppServer、注册各 Manager、挂载路由，lifespan 内按 stage 启动/逆序释放。stage: 0 Logging→1 Redis/PG/Model/FileProvider(并发)→2 Milvus/FaqCache/NacosConfig→3 NacosDiscover。"""
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 

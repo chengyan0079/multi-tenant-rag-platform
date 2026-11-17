@@ -1,13 +1,4 @@
-"""检索片段压缩：按大小（字符数）对 chunks 做 L0 截取 / L1 精选 / L2 摘要。
-
-设计方案见 docs/上下文压缩设计方案.md §5。定位是**兜底**：
-多轮场景的常规裁剪（记忆 / 历史）不在这里，见 core.rag_generator.assembly；
-本模块只在"chunks 自身就让 prompt 超窗"时才真正动手。
-
-  L0 按大小截取（零成本）→ L1 相关性精选（零成本）→ L2 LLM 摘要（付费，默认关）
-
-做任何一步都不允许抛错到主链路：异常一律回退原样并告警。
-"""
+"""检索片段压缩（兜底）：chunks 自身超窗时按 L0 截取 / L1 精选 / L2 摘要，任何一步失败回退原样。"""
 from dataclasses import dataclass, field, replace
 
 from common.config import config
@@ -26,7 +17,7 @@ _SUMMARY_PROMPT = (
 
 @dataclass
 class CompressResult:
-    """压缩结果：保留的片段 + 过程信息（供可观测与 RAGAS 取数，见设计方案 §10.2）。"""
+    """压缩结果：保留的片段 + 过程信息（供可观测与 RAGAS 取数）。"""
     chunks: list[RetrievedChunk]
     method: str = 'none'                      # none | truncate | select | llm_summary
     chars_before: int = 0
@@ -153,7 +144,7 @@ async def compress_context(
         method = 'truncate'
 
     # 既没丢片段、也没截短内容 → 按 none 计。否则每个请求都会记成 truncate，
-    # "压缩触发率"这个指标会虚高到 100%，失去观测意义（设计方案 §7 要靠它判断上游是否该调参数）
+    # "压缩触发率"这个指标会虚高到 100%，失去观测意义
     if len(kept) == total_count and all(texts[i] == chunks[i].content for i in kept):
         method = 'none'
 

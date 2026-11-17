@@ -1,10 +1,6 @@
-# [运营后台 dashboard 接口]
-"""文件（文档上传 / 版本 / 下载）（§17.3）
+"""文件上传 / 版本 / 下载接口（运营后台）。
 
-数据模型：rag_file（文档列表，一个 base_key 一行）+ rag_file_version（版本历史，一个版本一行）。
-上传幂等：同租户同 base_key 复用同一文档；同文档同内容（file_hash）不新增版本（dedup）；
-版本号 MAX(version)+1（撞唯一约束重试）；对象路径含版本，互不覆盖。
-数据访问在 store.file_dao.FileDao；本路由只做 HTTP 编排 + 实体→响应映射（上传人校验、扩展名解析）。
+上传幂等：同租户同 base_key 复用文档；同内容（file_hash）不新增版本；对象路径含版本互不覆盖。
 """
 from urllib.parse import quote
 

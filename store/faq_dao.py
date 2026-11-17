@@ -1,8 +1,4 @@
-"""FAQ DAO（store 数据访问层）：rag_faq 的 PostgreSQL 增删改查 + Redis 缓存刷新。
-
-返回 ORM 实体 / 简单值；实体 → 响应模型（app.api.schemas）的映射在路由层完成，
-故本模块不依赖 app，保持 store 层纯净。
-"""
+"""FAQ DAO：rag_faq 的 PG 增删改查 + Redis 缓存刷新；实体→响应映射在路由层，保持 store 层纯净。"""
 from sqlalchemy import select
 
 from store.faq_cache import delete_faq_cache, upsert_faq_cache

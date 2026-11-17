@@ -1,12 +1,4 @@
-"""NacosConfigManager（order=105）：配置中心启动（P1）。
-
-独立于 NacosDiscoverManager（order=110，仅服务发现）。本 Manager 启动时做两件事：
-  1. 拉起 ConfigCenterLoader（SDK gRPC 长连接订阅配置变更），并注入 app_state 供健康检查读取；
-  2. 把 PROMPT 组的提示词配置拉取并写入 Redis 预热（core.config_center.prompts_cache），
-     使运行时取提示词优先命中 Redis、未命中再回源 Nacos。
-
-两者都是旁路能力：失败只告警，不阻断启动（运行时 get_prompt 会直连 Nacos 兜底）。
-"""
+"""NacosConfigManager（order=105）：配置中心启动。拉起 ConfigCenterLoader（gRPC 订阅变更）+ 预热 PROMPT 组到 Redis；旁路能力失败只告警不阻断启动。"""
 import asyncio
 
 from app.app_state import app_state

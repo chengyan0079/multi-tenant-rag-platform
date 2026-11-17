@@ -1,9 +1,4 @@
-"""会话记忆存储（store 数据访问层）：Redis 存 {summary, facts, updated_at}。
-
-隔离维度 (user_id, session_id)，与对话原文同前缀、独立键后缀 `:memory`。
-TTL 取自配置 common.config.REDIS_TTL_MEMORY。
-SessionMemory 为记忆值对象（存储型），与 store 同层定义，避免 store→core 反向依赖。
-"""
+"""会话记忆存储：Redis 存 {summary,facts,updated_at}，按 (user_id,session_id) 隔离，键后缀 :memory。SessionMemory 为记忆值对象，避免 store→core 反向依赖。"""
 import json
 import time
 from dataclasses import dataclass, field

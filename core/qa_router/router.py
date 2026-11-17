@@ -1,19 +1,7 @@
-"""
-router - 问答路由编排
+"""问答路由编排：答案缓存 → 意图识别 → FAQ 优先 → 检索增强 + 生成。
 
-顺序：答案缓存（先行，命中即返回）→ 意图识别 → FAQ 命中（精确/BM25 相似匹配则直接取标准答案）
-→ 意图分流 + 检索增强 + 生成。
-FAQ 命中时不调用大模型，未命中再走 RAG。FAQ 匹配见 store.faq_cache（先字面精确，再 BM25 相似+阈值）。
-
-意图分流：
-- 通用知识 → 空上下文交由大模型用自身知识直答（不检索、不因无库命中而拒绝）；
-- 专业咨询 → 经 LLM 选检索增强策略（HyDE/子查询/回溯/直接）检索，检索无命中才回复"未找到"。
-
-检索条数由 config.RECALL_K（召回候选）/ config.RERANK_TOP_K（精排保留）统一控制，不按请求传 top_k。
-
-上下文压缩与会话记录持久化均已落地（设计方案见 docs/ 下对应文档）；LLM 结果审计
-保持 no-op——检索/生成质量评估交由离线 RAGAS 评测管道（offline/rag_eval.py），
-不在业务库做质量计算与持久化，避免给主链路引入重依赖。
+FAQ 命中不调大模型；专业咨询走 RAG，通用知识空上下文直答；检索条数由
+config.RECALL_K / RERANK_TOP_K 统一控制。质量评估交离线 RAGAS（offline/rag_eval.py）。
 """
 import asyncio
 import random
@@ -255,7 +243,7 @@ class QARouter:
     async def _compress_context(
         self, query: str, chunks: list[RetrievedChunk], session_id: str | None
     ) -> CompressResult:
-        """上下文压缩：检索片段累计超长时按大小截取/精选/摘要（设计方案见 docs/上下文压缩设计方案.md）。
+        """上下文压缩：检索片段累计超长时按大小截取/精选/摘要。
 
         压缩是兜底手段，任何异常都回退原样，不阻断生成。
         """

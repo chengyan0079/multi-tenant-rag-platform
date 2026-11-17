@@ -1,15 +1,4 @@
-"""
-intent - 查询意图识别模块（在线推理，二分类：通用知识 / 专业咨询）
-
-仅包含在线推理能力：
-- QueryClassifier：同步推理器（批量 + 缓存 + 设备自适应）。
-- get_classifier()：进程级单例，首次调用时加载模型，失败则降级（返回 None）。
-- classify_queries() / classify_query()：异步入口，内部用 asyncio.to_thread 包裹 BERT 前向，
-  避免 CPU 密集推理阻塞事件循环。
-
-训练/评估是离线流程，已分离到 offline/train_intent.py，本项目在线服务不参与。
-容错：torch 缺失时模块仍可导入，分类恒为默认标签，不影响主问答链路（FAQ + RAG）。
-"""
+"""查询意图识别（在线推理，二分类：通用知识/专业咨询）。QueryClassifier 同步推理（批量+缓存+设备自适应），get_classifier() 进程级单例懒加载、失败降级 None；classify_* 异步入口用 asyncio.to_thread 包裹 BERT 前向避免阻塞。训练评估在 offline/train_intent.py；torch 缺失时仍可导入，分类恒默认标签不影响主链路。"""
 import asyncio
 import threading
 from typing import Optional

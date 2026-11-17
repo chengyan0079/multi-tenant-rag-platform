@@ -1,11 +1,4 @@
-# [运营后台 dashboard 接口]
-"""FAQ（每租户高频问题，§17.5）
-
-管理员手动维护高频问题；启动时全量载入 Redis（见 store.faq_cache）。
-命中在问答主流程中由 store.faq_cache.get_faq_answer 做字面精确匹配。
-数据访问在 store.faq_dao.FaqDao；本路由只做 HTTP 编排 + 实体→响应映射。
-请求体 / 响应 data 结构统一见 app.api.schemas。
-"""
+"""FAQ 高频问题管理接口（运营后台）。命中由问答主流程 store.faq_cache 做精确匹配。"""
 from fastapi import APIRouter, Depends
 
 from app.api.deps import resolve_tenant

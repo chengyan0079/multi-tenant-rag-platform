@@ -1,11 +1,4 @@
-# [运营后台 dashboard 接口]
-"""配置中心只读接口（直连 Nacos，无副作用）。
-
-仅查询：命名空间列表 / 配置列表 / 配置详情 / 历史列表 / 历史详情。
-所有写操作见 routes_config_write（走审批流，不直接写 Nacos）。
-Nacos 原始结构（namespaces/list/history）属外部数据，按原样透传；仅 detail 的
-{'content': ...} 收敛为 app.api.schemas.ConfigContentData。
-"""
+"""配置中心只读接口（直连 Nacos，无副作用）。写操作走审批流，见 routes_config_write。"""
 import asyncio
 
 from fastapi import APIRouter, Depends

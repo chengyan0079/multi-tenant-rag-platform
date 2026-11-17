@@ -1,16 +1,4 @@
-"""MCPApiManager - 启动项：把 app 的 HTTP API 封装成 MCP 工具，起 MCP 服务供外部调用。
-
-启动时机：stage 3（路由已挂载、app_state.fastapi_app 就绪）。流程：
-  1. 遍历 FastAPI 路由，为每个 API 生成一个 MCP 工具（排除文档 / 自描述 / 探活路径）；
-  2. 注册到 FastMCP("rag-ultra-api")；
-  3. 在**守护线程**起 MCP 服务（默认 streamable-http），外部客户端连
-     http://{MCP_API_HOST}:{MCP_API_PORT}/mcp 即可调用业务 API。
-
-两个关键设计：
-- **工具调用走进程内 ASGI**（httpx ASGITransport）：不经网络、不额外占端口、不依赖服务已对外监听。
-- **用独立线程而非 asyncio 任务**：MCP 服务内部会起 uvicorn，非主线程时 uvicorn 会自动跳过
-  信号注册（capture_signals 仅主线程生效），避免与主服务的 SIGINT/SIGTERM 处理冲突。
-"""
+"""MCPApiManager（stage 3）：把 HTTP API 封装成 MCP 工具起 MCP 服务（streamable-http）。工具调用走进程内 ASGI（不经网络/不占端口）；用独立线程起服务，避免与主服务信号冲突。"""
 import re
 import threading
 from typing import Any, Iterator

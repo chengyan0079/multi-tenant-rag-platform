@@ -1,16 +1,4 @@
-"""
-provider - FileProvider 抽象与 FileRef 数据类（§4）
-
-统一返回"可下载/可上传 URL + 元信息（+ 可选 base64 内容）"。
-put_file 必须传入 tenant_id，oss_key 以 t{tenant_id}/ 前缀实现租户隔离；
-get_file / get_files / get_bytes 均可传 tenant_id 做归属校验，防止跨租户下载。
-下载用 get_bytes（原始字节流，勿用 base64）；base64 仅用于在 JSON 内承载字节（批量下载 / 小文件内联预览）。
-
-多服务通用：路由层只依赖 FileProvider 抽象，具体落地（MinIO / Mock / 未来 OSS）
-由 build_file_provider 按配置选择。对象路径规则与租户前缀集中在模块级函数
-（_safe_key / _build_object_key / _tenant_prefix）统一管理，各存储实现共用，
-保证不同后端下路径格式一致。
-"""
+"""FileProvider 抽象与 FileRef 数据类。统一返回 URL + 元信息（+ 可选 base64）；put/get 均按 tenant_id 做租户隔离与归属校验；对象路径/租户前缀集中在模块级函数，各后端共用。"""
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass

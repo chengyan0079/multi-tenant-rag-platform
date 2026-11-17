@@ -1,8 +1,4 @@
-"""
-loader_pptx - PPTX 文档加载器（文本 + 图片 OCR）
-
-Author: 骆昊
-"""
+"""PPTX 加载器：提取文本并对图片做 OCR。"""
 from io import BytesIO
 from typing import Iterator
 

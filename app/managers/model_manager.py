@@ -1,11 +1,4 @@
-"""ModelManager（order=50）：按注册表预加载各模型并注入 app_state。
-
-解耦要点：
-- 不感知具体模型类型，只持有一个 ModelLoader 注册表；
-- 默认注册 embedding / reranker / intent-bert 三个加载器，开箱即用；
-- 新增模型只需实现 ModelLoader 并 register_loader，本类零改动；
-- 单个模型加载失败不影响其他模型与服务启动（如意图分类缺失即降级）。
-"""
+"""ModelManager（order=50）：按注册表预加载模型并注入 app_state；默认 embedding/reranker/intent-bert 三加载器；单模型失败不影响启动（如意图分类缺失降级）。"""
 from typing import List
 
 from app.server import Manager

@@ -1,12 +1,4 @@
-"""
-model_loaders - 模型预加载加载器（与具体加载解耦）
-
-设计：每个具体模型实现一个 ModelLoader（name + load/unload），负责自身加载并写回
-app_state。ModelManager 只持有 loaders 注册表、遍历预加载，不感知具体模型类型。
-新增模型只需新增一个 Loader，并向 ModelManager.register_loader 注册，Manager 无需改动。
-
-加载细节（同步 CPU/GPU 加载）统一用 asyncio.to_thread 包裹，避免阻塞事件循环。
-"""
+"""模型预加载加载器：每个模型实现 ModelLoader（load/unload 写回 app_state），ModelManager 持注册表遍历预加载，新增模型零改 Manager。同步加载用 asyncio.to_thread 包裹。"""
 import asyncio
 from abc import ABC, abstractmethod
 from typing import Any
