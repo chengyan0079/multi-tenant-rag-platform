@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "fault_extract",
+  "description": "基建运维故障复盘结构化抽取输出。用于 vLLM guided_json 受限解码与训练数据校验。",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["fault_id", "title", "severity", "start_time", "symptoms", "root_cause"],
+  "properties": {
+    "fault_id": {
+      "type": "string",
+      "description": "故障单编号，形如 INC-2026-0412，从文档正文或工单号中取出。",
+      "pattern": "^INC-[0-9A-Za-z-]{4,}$"
+    },
+    "title": {
+      "type": "string",
+      "description": "一句话概括，不超过 30 字，不含时间与编号。",
+      "maxLength": 60
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["P1", "P2", "P3"],
+      "description": "P1=业务不可用或数据丢失；P2=部分功能受损或明显降级；P3=无业务影响或仅性能劣化。"
+    },
+    "start_time": {
+      "type": "string",
+      "description": "故障起始时刻，ISO 8601 带时区，精确到秒或分钟，例如 2026-04-12T14:02:00+08:00。"
+    },
+    "symptoms": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "description": "可观测到的现象，每条含名称与观察时刻。名称须含具体指标值（如 5xx 占比 43%），不写推测性描述。",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "observed_at"],
+        "properties": {
+          "name": {"type": "string", "maxLength": 60},
+          "observed_at": {"type": "string"}
+        }
+      }
+    },
+    "change": {
+      "description": "引发故障的变更。文档未提及变更时填 null，不得凭推测填写。",
+      "anyOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["type", "content", "time"],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["config", "release"],
+              "description": "config=配置项变更（含热更与重启生效）；release=版本发布或镜像变更。"
+            },
+            "content": {"type": "string", "maxLength": 120, "description": "改了什么，含变更前后值。"},
+            "time": {"type": "string"}
+          }
+        }
+      ]
+    },
+    "root_cause": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "description"],
+      "properties": {
+        "category": {
+          "type": "string",
+          "enum": ["config", "capacity", "dependency"],
+          "description": "config=参数或配置错误；capacity=容量、资源、配额不足；dependency=上游或依赖组件不可用。"
+        },
+        "description": {"type": "string", "maxLength": 200}
+      }
+    },
+    "runbook": {
+      "description": "复盘给出的处置步骤。文档只有临时规避或无明确步骤时填 null。",
+      "anyOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["title", "steps"],
+          "properties": {
+            "title": {"type": "string", "maxLength": 40},
+            "steps": {"type": "array", "minItems": 2, "maxItems": 8, "items": {"type": "string", "maxLength": 120}}
+          }
+        }
+      ]
+    }
+  }
+}

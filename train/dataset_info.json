@@ -1,0 +1,18 @@
+{
+  "fault_extract": {
+    "file_name": "data/fault_extract.json",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output"
+    }
+  },
+  "fault_extract_eval": {
+    "file_name": "data/fault_eval.json",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output"
+    }
+  }
+}
