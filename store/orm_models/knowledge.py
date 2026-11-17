@@ -1,8 +1,4 @@
-"""知识域模型：document / chunk / index_task（租户级，无 kb_id）。
-
-文档/切片直接归属租户（tenant_id），不再挂知识库；检索仅按租户 + scope 隔离，
-与 MinIO 存储（t{tenant_id}/ 前缀）、FAQ（租户级）保持一致。
-"""
+"""知识域模型：document / chunk / index_task（租户级，无 kb_id；检索按 tenant_id+scope 隔离）。"""
 from datetime import datetime
 
 from sqlalchemy import (

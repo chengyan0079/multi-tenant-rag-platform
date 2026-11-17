@@ -1,11 +1,4 @@
-"""文档（索引）DAO（store 数据访问层）：rag_document / rag_chunk 的 PostgreSQL 操作。
-
-文档解析流程：POST /admin/docs 落 rag_document(status=0) → 投递索引任务 →
-IndexManager 消费后由 core.rag_indexer.pipeline 完成切分 + 向量化，并把切片写 rag_chunk、
-向量写 Milvus，最后回写 rag_document.status(2=完成 / 3=失败)。
-
-实体 → 响应模型的映射在路由层完成，本模块不依赖 app.api.schemas。
-"""
+"""文档（索引）DAO：rag_document / rag_chunk 的 PG 操作。落记录(status=0)→投递索引任务→pipeline 切分+向量化→回写 status(2完成/3失败)；实体→响应映射在路由层。"""
 from sqlalchemy import delete, select, update, func
 
 from app.app_state import app_state

@@ -1,20 +1,4 @@
-"""
-middleware - 调用方签名校验 + 全链路 trace_id 透传 + API 调用日志
-
-AuthSignatureMiddleware：校验调用方签名（HMAC-SHA256，见 core.auth），防"绕过网关
-直连本服务、伪造 X-Tenant-Id/X-User-Id"。未通过直接返回 401 统一响应，不进路由。
-纯 ASGI 且不吃请求体，故流式响应与大文件上传不受影响；MCP 工具经进程内 ASGI 调用
-业务 API，同样会经过这里，不需要额外在 MCP 侧再校验一遍。
-
-TraceMiddleware：缺失 trace 则生成，响应头回写 X-Trace-Id（与网关对齐，设计文档 §18）。
-
-ApiLogMiddleware：记录每次 API 调用的调用方 / 请求头 / 方法 / 路由 / 请求体 / 响应体 / 耗时，
-"请求"与"响应"各打一条日志（便于按时间线排障），并合并落一行到 rag_api_call_log。
-实现要点（纯 ASGI，不用 BaseHTTPMiddleware）：
-  - 请求体：仅对 POST/PUT/PATCH 的 JSON/文本且长度可控者捕获，捕获后原样重放给下游，
-    保证业务代码仍能读到完整 body；multipart（文件上传）与超大体不消费、不记录，避免大文件入内存。
-  - 响应体：逐块透传的同时按上限累积（不阻塞 SSE 流式），超限截断。
-"""
+"""中间件三件套：AuthSignatureMiddleware（HMAC-SHA256 校验，防伪造 X-Tenant-Id/User-Id，失败返 401）/ TraceMiddleware（缺失 trace 则生成并回写 X-Trace-Id）/ ApiLogMiddleware（采集请求与响应合并落库，敏感头脱敏、流式与大文件不拦）。均纯 ASGI 不阻塞事件循环。"""
 import json
 import time
 import uuid

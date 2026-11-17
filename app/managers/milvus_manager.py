@@ -1,8 +1,4 @@
-"""MilvusManager（order/stage：stage 2，依赖 Model）：启动时确保数据库与集合就绪。
-
-已合并原 scripts/init_milvus.py 的职责：启动即"确保数据库存在（缺失则创建）→ 确保集合
-存在（缺失则创建 + 索引）→ 加载到内存"，已存在则直接加载，全程幂等。无需再单独运行初始化脚本。
-"""
+"""MilvusManager（stage 2）：启动确保 Milvus 数据库与集合就绪（缺失则创建+建索引，存在则直接加载，幂等），已并入原 init_milvus 脚本职责。"""
 from pymilvus import AsyncMilvusClient
 
 from app.server import Manager

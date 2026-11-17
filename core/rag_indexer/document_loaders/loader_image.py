@@ -1,8 +1,4 @@
-"""
-loader_image - 图像（OCR）内容加载器
-
-Author: 骆昊
-"""
+"""图像加载器：对图片做 OCR 提取文字。"""
 from pathlib import Path
 from typing import Iterator, List
 

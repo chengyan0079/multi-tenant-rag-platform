@@ -1,9 +1,4 @@
-"""
-app_state - 全局共享状态与请求上下文
-
-启动期注入：settings / redis / engine / milvus_store / model / file_provider / app。
-请求期（contextvars）：tenant_id / user_id / trace_id，由 M1 依赖注入透传。
-"""
+"""全局共享状态：启动期注入 settings/redis/engine/milvus_store/model/file_provider/app；请求期 contextvars 透传 tenant_id/user_id/trace_id。"""
 from __future__ import annotations
 
 import contextvars
@@ -23,6 +18,7 @@ if TYPE_CHECKING:
     from redis.asyncio import Redis
     from sqlalchemy.ext.asyncio import AsyncEngine
     from store.milvus_store import MilvusStore
+    from store.neo4j_store import Neo4jStore
 
 
 class _AppState:
@@ -42,6 +38,7 @@ class _AppState:
         self.mcp_server: Optional[FastMCP] = None             # MCP 服务实例（MCPApiManager 注入）
         self.nacos_discovery: Optional[NacosDiscoverManager] = None  # 服务注册状态（供健康检查）
         self.config_center: Optional[ConfigCenterLoader] = None     # 配置中心长连接（NacosConfigManager 注入）
+        self.neo4j_store: Optional[Neo4jStore] = None               # 故障图谱（图路，GRAPH_ENABLED 时注入）
 
 
 app_state = _AppState()

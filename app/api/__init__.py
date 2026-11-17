@@ -37,6 +37,7 @@ def configure_routes(app: FastAPI) -> None:
     from app.api.dashboard import (
         routes_health, routes_doc, routes_faq, routes_file,
         routes_config_read, routes_config_write, routes_retrieve,
+        routes_graph,
     )
 
     app.include_router(routes_health.router)
@@ -48,6 +49,7 @@ def configure_routes(app: FastAPI) -> None:
     app.include_router(routes_config_read.router)
     app.include_router(routes_config_write.router)
     app.include_router(routes_retrieve.router)
+    app.include_router(routes_graph.router)
 
     from app.middleware import ApiLogMiddleware, AuthSignatureMiddleware, TraceMiddleware
     # 后加者位于更外层，故实际执行顺序（外→内）为：CORS → Trace → ApiLog → Auth → 路由。

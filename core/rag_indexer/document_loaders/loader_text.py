@@ -1,8 +1,4 @@
-"""
-loader_text - 纯文本加载器
-
-Author: 骆昊
-"""
+"""纯文本加载器（UTF-8）。"""
 import hashlib
 from pathlib import Path
 from typing import Iterator

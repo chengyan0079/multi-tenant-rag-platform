@@ -1,17 +1,4 @@
-"""生成调用方签名头（X-Auth-Timestamp / X-Auth-Nonce / X-Auth-Signature），用于接口自测。
-
-项目还没接 Java 网关，联调/自测时用它扮演"网关"的角色：按与服务端一致的 canonical 串
-（core.auth.signature）生成签名头，附上可直接粘贴的 curl 命令。
-
-两种用法（推荐第一种）：
-  1. 直接运行：改下方 DEMO_* 常量后运行本文件（IDE 里右键 Run 即可），无需命令行参数；
-  2. 命令行运行（参数优先级高于 DEMO_*）：
-     python scripts/gen_auth_headers.py --method GET --path /v1/faq --tenant 100 --user 1001
-
-开启校验（服务端侧 .env）：
-    AUTH_HMAC_ENABLED=True
-    AUTH_HMAC_SECRET=devsecret
-"""
+"""生成调用方签名头（X-Auth-Timestamp/Nonce/Signature）用于接口自测，扮演"网关"角色按 core.auth 一致 canonical 生成签名并输出 curl。支持直接运行（改 DEMO_*）或命令行参数。"""
 import argparse
 import sys
 from pathlib import Path

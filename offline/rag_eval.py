@@ -1,26 +1,4 @@
-"""
-rag_eval - RAGAS 离线评测（参考 rag-pro/assessment/rag_as.py）
-
-用途：对一批 (question, answer, contexts, reference) 跑 RAGAS 指标，量化检索/生成质量。
-与线上运行时解耦——本项目线上 LLM 结果审计仍是 no-op（router._audit_llm_result），
-评测只在独立环境批量跑，依赖（ragas / langchain-community）不进运行时 requirements.txt。
-
-数据来源（二选一，CLI 切换）：
-  1) --file <path>     读取人工标注 JSON（rag-pro 风格，每条含 reference）
-  2) --from-db         从业务库捞真实检索数据：
-       - question/answer 来自 rag_turn（user/assistant 两行按 turn_id 配对，tenant 隔离）
-       - retrieved_contexts 来自 rag_turn.chunks_json 的 chunk_id → 回查 rag_chunk.content
-         （chunks_json 若存了全文 text 则直接用，免 join；详见 docs/会话记录持久化设计方案 §9.2）
-       - reference 来自 rag_eval_label（人工/外部标准答案，LEFT JOIN；缺标则只跑两项指标）
-
-指标：
-  - Faithfulness    忠实度：答案是否忠于检索上下文（查幻觉）—— 不需要 reference
-  - AnswerRelevancy 答案相关性：是否切题 —— 不需要 reference
-  - ContextPrecision 上下文精确度：召回里有多少真有用（查噪声）—— 需要 reference
-  - ContextRecall   上下文召回率：召回是否覆盖参考答案关键信息（查漏）—— 需要 reference
-
-依赖：pip install -r offline/requirements.ragas.txt
-"""
+"""RAGAS 离线评测（与线上解耦，依赖不进运行时）：对 (question,answer,contexts,reference) 批量跑 Faithfulness/AnswerRelevancy/ContextPrecision/ContextRecall。数据来源 CLI 切换：--file 标注 JSON 或 --from-db 业务库（rag_turn+rag_chunk+rag_eval_label，缺标则只跑前两项）。"""
 import argparse
 import asyncio
 import json

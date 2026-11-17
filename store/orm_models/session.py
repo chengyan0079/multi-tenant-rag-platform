@@ -1,8 +1,4 @@
-"""会话注册表 ORM 模型（PostgreSQL 持久化，对应 schema_postgresql.sql 的 rag_session 表）。
-
-只按 user_id 隔离（user_id 由网关 OAuth 全局唯一下发，跨租户不重复），不挂 tenant_id；
-对话原文仍存 Redis（热路径）。见 docs/访问模型与会话架构决策.md §2.2。
-"""
+"""会话注册表 ORM 模型（rag_session）。仅按 user_id 隔离（网关 OAuth 下发），对话原文存 Redis 热路径。"""
 from datetime import datetime
 
 from sqlalchemy import BigInteger, DateTime, Index, Integer, String, Text, UniqueConstraint

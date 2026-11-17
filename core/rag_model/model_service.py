@@ -1,11 +1,4 @@
-"""
-model_service - 模型服务
-
-封装 bge-m3（一次推理同时产出 dense 与 sparse 向量）和 bge-reranker-v2-m3（重排）。
-加载被拆为 load_embedding() / load_reranker() 两个独立步骤，便于 ModelManager 按
-模型粒度注册预加载（见 app.managers.model_loaders）。load() 作为便捷组合保留。
-由 AppServer 的 ModelManager 加载后注入 app_state.model_service。
-"""
+"""模型服务：封装 bge-m3（一次推理产出 dense+sparse 向量）与 bge-reranker-v2-m3 重排。加载拆为 load_embedding/load_reranker 便于按模型粒度预加载。"""
 from typing import Any
 
 # pymilvus 3.x 起把 model 子模块拆分为独立包 milvus-model；直接按 3.x 方式导入

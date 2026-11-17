@@ -1,9 +1,4 @@
-"""
-faq_cache_manager - 启动项：把 rag_faq 全量载入 Redis 缓存（设计文档 §11）
-
-顺序需在 RedisManager(20) 与 PostgresManager(30) 之后，故注册 order=35。
-载入失败不影响整体启动，FAQ 查询会回源 DB（store.faq_cache 冷启动兜底）。
-"""
+"""FaqCacheManager（order=35，在 Redis/PG 之后）：启动时全量载入 FAQ 到 Redis，失败不影响启动（查询回源 DB）。"""
 from app.server import Manager
 from common.logger import logger
 from store.faq_cache import load_all_faqs_to_redis

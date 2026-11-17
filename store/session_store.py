@@ -1,10 +1,4 @@
-"""会话存储（store 数据访问层）：Redis 对话原文/元数据 + PostgreSQL 注册表（rag_session）。
-
-- 对话原文：Redis LIST，TTL=30d
-- 注册表：PostgreSQL rag_session（标题/预览/轮数/时间），保证列表可长期回看
-隔离维度 (user_id, session_id)，跨用户不可见（user_id 由网关全局唯一下发）。
-SessionView 为注册表轻量读投影（存储型 DTO），与 store 同层定义，避免 store→core 反向依赖。
-"""
+"""会话存储：Redis 对话原文（LIST，TTL=30d）+ PostgreSQL rag_session 注册表；按 (user_id,session_id) 隔离。SessionView 为注册表读投影，避免 store→core 反向依赖。"""
 import json
 import time
 import uuid

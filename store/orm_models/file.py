@@ -1,12 +1,4 @@
-"""文件模型：文档列表（rag_file）+ 版本历史（rag_file_version）。
-
-一个文档（base_key）在 rag_file 存一行（冗余"当前版本"快照，供列表直查）；
-每次上传在 rag_file_version 存一行（版本历史）。文档租户内共享（下载不按用户隔离），
-上传人分别记录：rag_file.create_user_id=创建人，rag_file_version.upload_user_id=该版本上传人。
-
-幂等：UNIQUE(tenant_id, base_key) 保证文档唯一；UNIQUE(file_id, file_hash) 保证同文档同内容
-只留一个版本（重复上传相同内容不新增版本）。
-"""
+"""文件模型：rag_file（文档列表，冗余当前版本快照）+ rag_file_version（版本历史）。幂等：UNIQUE(tenant_id,base_key) 保证文档唯一，UNIQUE(file_id,file_hash) 保证同内容不新增版本；上传人分别记录。"""
 from datetime import datetime
 
 from sqlalchemy import BigInteger, DateTime, Integer, SmallInteger, String

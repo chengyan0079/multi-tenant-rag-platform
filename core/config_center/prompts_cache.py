@@ -1,17 +1,4 @@
-"""
-prompts_cache - 提示词缓存（先 Redis 再 Nacos）
-
-读取链路（自上而下回源）：
-  1. Redis：进程外共享缓存。启动时由 NacosConfigManager 预热写入；配置经审批流变更后主动刷新。
-  2. Nacos 配置中心（PROMPT 组，namespace=rag-ultra）Open API：持久化源。
-Nacos 不可达或配置缺失时，调用方应自行回退到内置模板。
-
-实现要点：
-- 同步接口：Redis 用 redis-py 同步客户端，便于在同步/异步上下文中都能直接调用
-  （与项目既有的 redis.asyncio 即 app_state.redis 用于答案缓存等并存，不冲突）。
-- Redis 不可用时自动降级为直连 Nacos，不阻断业务。
-- Redis key 带前缀且设有有效期（TTL），前缀与 TTL 统一由 store.redis_keys 管理。
-"""
+"""提示词缓存：先 Redis 后 Nacos（PROMPT 组），Nacos 不可达时调用方回退内置模板；Redis 不可用降级直连 Nacos。key 前缀/TTL 由 store.redis_keys 管理。"""
 import json
 from typing import Optional
 

@@ -1,15 +1,4 @@
-"""
-faq_cache - FAQ 高频问题缓存（数据库源 + Redis 缓存，字面精确匹配）
-
-设计（与 rag-pro 一致，PostgreSQL+Redis，不用 Milvus）：
-- 源数据在 rag_faq（数据库），按 tenant_id 隔离。
-- 启动时全量载入 Redis：每条 faq:{id} 存完整记录，每个租户一份候选列表
-  faq:tenant:{tid}:items（仅含匹配所需字段）。
-- 查询时做归一化后的精确匹配：先比 question，再比 similar_questions 各条；
-  命中即返回标准答案，避免误触发（不调用大模型）。
-- 增删改走写穿透：改动后重载该租户缓存，保证 Redis 与数据库一致。
-- 冷启动兜底：Redis 中某租户未载入时，回源数据库查询该租户（小集合）。
-"""
+"""FAQ 缓存（rag_faq 源 + Redis 缓存，按 tenant_id 隔离）。启动全量载入 Redis，查询归一化后精确匹配（question/similar_questions），命中返回标准答案不调模型；增删改写穿透重载；冷启动回源库。"""
 from typing import Any, Optional, Tuple
 
 from sqlalchemy import select

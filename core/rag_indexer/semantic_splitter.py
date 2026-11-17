@@ -1,6 +1,4 @@
-"""
-semantic_splitter - 基于 BGE-M3 的长文本语义切分器
-"""
+"""基于 BGE-M3 的长文本语义切分器。"""
 from pathlib import Path
 from typing import Any
 

@@ -1,8 +1,4 @@
-"""signature - HMAC-SHA256 请求签名的生成与校验（纯函数，不依赖 web 框架）。
-
-约定见 core.auth.__init__ 文档。这里的函数都不碰 Redis / 请求对象，便于单测与被复用
-（生成侧的 demo 脚本、校验侧的中间件用的是同一套 canonical，保证不会两端写歪）。
-"""
+"""HMAC-SHA256 请求签名的生成与校验（纯函数，不依赖 web 框架，便于单测与复用）。约定见 core.auth.__init__。"""
 import hashlib
 import hmac
 import secrets as _secrets

@@ -1,11 +1,4 @@
-"""
-config2 - 配置类（更好的版本）
-
-说明：推荐使用 Pydantic Settings 彻底替代 configparser。它提供自动类型校验、环境变量自动映射及默认值约束。
-
-Author: 骆昊
-Version: 0.0.1
-"""
+"""全局配置：Pydantic Settings，自动类型校验 + 环境变量映射 + .env 覆盖。"""
 from pathlib import Path
 from typing import Annotated
 
@@ -46,7 +39,7 @@ class Config(BaseSettings):
     SUBQUERY_MAX:          int = Field(default=3, ge=1)             # 子查询拆分最大条数
     STRATEGY_SELECT_ENABLED: bool = True                            # 是否启用 LLM 检索策略路由（关闭则专业咨询也走直接检索）
 
-    # 问答明细落库（详见 docs/会话记录持久化设计方案.md）
+    # 问答明细落库
     QA_PERSIST_ENABLED:         bool = True    # 总开关；false 时 _persist_session 直接返回（保持 no-op 行为）
     QA_PERSIST_ASYNC:           bool = True    # 异步落库；false 走同步 await（单测/排障用）
     QA_PERSIST_MAX_TURNS:       int = 400      # Redis LIST 单会话保留的消息条数（一轮 2 条），超出 LTRIM
@@ -54,7 +47,7 @@ class Config(BaseSettings):
     QA_PERSIST_CHUNK_FULLTEXT:  bool = False   # chunks 是否附带片段全文；默认只存引用（doc_name/page/score）
     QA_EVAL_SAMPLE_RATE:        float = Field(default=0.05, ge=0.0, le=1.0)  # 评测采样率，命中时 rag_turn.eval_flag=1
 
-    # 上下文装配与压缩（按字符数配置，非 token；详见 docs/上下文压缩设计方案.md）
+    # 上下文装配与压缩（按字符数配置，非 token）
     # 多轮装配侧：记忆 / 历史注入上限
     HISTORY_MAX_MESSAGES: int = Field(default=6, ge=0)   # 注入 prompt 的历史消息条数（替代 get_history 写死的 last=6）
     MEMORY_MAX_CHARS:     int = Field(default=2000, ge=0)  # 记忆注入文本字符上限，超限按句截断
@@ -108,6 +101,21 @@ class Config(BaseSettings):
     MILVUS_URI:      str = 'http://localhost:19530'   # AppServer 注册项注入时优先用此 URI
     MILVUS_DB_NAME:  str = 'rag_ultra'
     MILVUS_COLLECTION: str = 'rag_chunks'
+
+    # 故障图谱（GraphRAG 侧车）：离线建图 + 在线图检索，默认关闭，独立接口跑通后再接主链路
+    NEO4J_URI:           str = 'bolt://localhost:7687'
+    NEO4J_USER:          str = 'neo4j'
+    NEO4J_PASSWORD:      str = ''
+    GRAPH_ENABLED:       bool = True    # 主链路是否启用图路；false 时 qa_router 行为与现状一致
+    GRAPH_MAX_EVIDENCE:  int = 24        # 图路单请求候选上限（3 条链 × 每链 ≤8 条证据）
+    GRAPH_QUERY_TIMEOUT: float = 0.8     # 图路超时（秒），超时退化为纯向量
+    GRAPH_INGEST_ENABLED: bool = True    # 上传复盘文本（doc_type=2）后是否自动入图
+    GRAPH_SCHEDULE_ENABLED: bool = True  # 是否启用定时结构化建图
+    GRAPH_SCHEDULE_INTERVAL_SEC: int = 3600  # 定时建图周期（秒）
+
+    # 故障要素抽取模型（vLLM OpenAI 兼容，离线建图用；地址与模型名配置化）
+    VLLM_BASE_URL:       str = ''        # 如 http://127.0.0.1:8100/v1
+    VLLM_EXTRACT_MODEL:  str = ''        # 如 qwen2.5-merged-1117
 
     # 文本加载时的备用编码降级顺序：优先编码解码失败后，依次尝试以下编码
     CANDIDATE_ENCODINGS: list[str] = ['utf-8-sig', 'gbk', 'gb2312', 'gb18030', 'big5']

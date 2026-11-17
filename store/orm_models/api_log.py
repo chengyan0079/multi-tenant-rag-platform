@@ -1,13 +1,4 @@
-"""API 调用日志模型（rag_api_call_log）：一条请求一行。
-
-由 app.middleware.ApiLogMiddleware 写入：请求进入时采集请求侧信息，响应返回后补齐响应侧，
-一次调用在表中只落一行（"一条请求对应一条响应"）。请求与响应分别打日志便于排障，落库合并一行。
-
-说明：
-- req_headers 存 JSON（敏感头如 authorization/cookie 已脱敏为 ***）；
-- req_body / resp_body 超 API_LOG_MAX_BODY 截断；multipart（文件上传）不记录请求体；
-- 耗时以 cost_ms（毫秒）为准，req_time / resp_time 为秒精度时间戳。
-"""
+"""API 调用日志模型（rag_api_call_log）：每请求一行，由 ApiLogMiddleware 写入（请求进/响应回各采集后合并落库）。req_headers 脱敏、body 超长截断、multipart 不记请求体；cost_ms 为耗时。"""
 from datetime import datetime
 
 from sqlalchemy import JSON, BigInteger, DateTime, Index, Integer, String, Text

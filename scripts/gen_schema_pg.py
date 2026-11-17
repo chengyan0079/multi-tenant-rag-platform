@@ -1,14 +1,4 @@
-"""从 store/orm_models 生成 PostgreSQL 建表脚本 scripts/schema_postgresql.sql（保证与 ORM 一致）。
-
-用法：python scripts/gen_schema_pg.py
-模型变更后重新运行本脚本即可同步（该文件由脚本生成，请勿手改）。
-
-与 MySQL 版（已废弃）的差异来自 PG 的语法限制：
-  - PG 没有行内 COMMENT 语法，表/列注释改用 COMMENT ON 语句；
-  - PG 没有 MEDIUMTEXT，映射为 TEXT（PG 的 TEXT 本身无长度上限）；
-  - 自增主键由 BIGINT AUTO_INCREMENT 变为 BIGSERIAL。
-分区与表顺序由下方 SECTIONS 决定，是生成脚本的唯一事实来源。
-"""
+"""从 store/orm_models 生成 scripts/schema_postgresql.sql（与 ORM 一致，勿手改）。PG 差异：COMMENT ON 语句、TEXT 替代 MEDIUMTEXT、BIGSERIAL 自增；分区与表顺序由 SECTIONS 决定。运行 python scripts/gen_schema_pg.py。"""
 import sys
 from pathlib import Path
 

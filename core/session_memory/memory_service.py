@@ -1,9 +1,4 @@
-"""会话记忆服务：compaction（LLM 增量压缩）+ 注入文本构造。
-
-对齐 Octop 的 octop_memory.core.Memory 的 compacting 阶段：每若干轮由 LLM 把
-"旧记忆 + 最近对话"压缩成新的 summary + facts，写回存储。调用方（SessionService）
-负责节流触发；本服务只做压缩与注入文本生成。
-"""
+"""会话记忆服务：LLM 增量压缩（compaction）+ 注入文本构造。每若干轮把"旧记忆+最近对话"压成 summary+facts，由调用方节流触发。"""
 import json
 import re
 from typing import Any

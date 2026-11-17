@@ -205,6 +205,7 @@ class HealthData(BaseModel):
     mcp: bool = Field(..., description="MCP API 服务是否就绪（未启用为 False）")
     nacos: bool = Field(..., description="Nacos 服务发现是否已注册成功（未启用/注册失败为 False）")
     config_center: bool = Field(..., description="配置中心是否已连上（未启用为 False）")
+    graph: bool = Field(False, description="故障图谱 Neo4j 是否就绪（未启用为 False）")
 
 
 # ============ 配置中心 - 写（审批流，运营后台）============

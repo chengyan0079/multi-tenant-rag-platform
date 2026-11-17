@@ -1,11 +1,4 @@
-"""
-server - Manager 启动项 + AppServer 编排（设计文档 §11）
-
-每个启动项封装成 XXManager（统一 start()/stop()），按"阶段(stage)"分批启动：
-同一 stage 内相互独立的 Manager 用 asyncio.gather 并发执行以缩短启动耗时，
-stage 之间按序执行以满足依赖；任一启动项失败即记 "启动失败" 日志并回滚已启动项。
-HTTP 服务由 uvicorn 以 workers 多进程方式拉起（见 app/main.py）。
-"""
+"""Manager 启动项 + AppServer 编排：启动项封装为 XXManager（统一 start/stop），按 stage 分批，同 stage 内 gather 并发、stage 间按序，失败回滚已启动项。"""
 import asyncio
 import time
 from typing import Dict, List, Tuple

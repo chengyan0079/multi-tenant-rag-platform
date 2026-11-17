@@ -1,14 +1,4 @@
-"""NacosDiscoverManager（stage 3）：服务注册 + 注销（仅服务发现，不做配置中心）。
-
-适配 **Nacos Server 3.x + nacos-sdk-python 2.0+**（导入路径 `v2.nacos`，全异步 API）：
-  - 客户端：`ClientConfig` + `await NacosNamingService.create_naming_service(...)`
-  - 注册：`await register_instance(RegisterInstanceParam(..., ephemeral=True))`
-  - 心跳：由 SDK 通过 gRPC 长连接**自动维持**（3.x 已移除 send_heartbeat），无需自建心跳任务
-  - 注销：`await deregister_instance(...)` + `await shutdown()`
-
-注：1.x 的 `nacos.NacosClient` 走的是 v1 注册接口 /nacos/v1/ns/instance，该接口在
-Nacos 3.x 已移除（返回 501），故不可用。
-"""
+"""NacosDiscoverManager（stage 3）：服务注册/注销（仅发现端，Nacos 3.x + sdk 2.0+）。心跳由 SDK gRPC 自动维持；1.x 的 v1 注册接口在 3.x 已移除故不可用。放最后确保服务已监听再对外暴露。"""
 from app.app_state import app_state
 from app.server import Manager
 from common.config import config

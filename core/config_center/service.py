@@ -1,14 +1,4 @@
-"""
-service - 配置中心审批流服务（ConfigChangeService）
-
-职责：申请 / 复核 / 回滚 / 列表查询。所有 Nacos 写操作仅在审批通过后由本服务触发，
-并携带 casMd5 做乐观锁（见 docs/配置中心对接设计.md §6.1）。
-纯数据库增删改查已抽离到 core.config_center.config_store（ConfigStore），本服务只做业务编排。
-
-并发控制（配置中心为管理员低频操作，无高并发）：
-- 悲观锁：复核时对申请单行加 `FOR UPDATE`，保证状态只迁移一次。
-- 乐观锁：执行 Nacos 写时携带申请时抓取的当前 md5 作为 casMd5；期间若配置被改则拒绝。
-"""
+"""配置中心审批流服务：申请/复核/回滚/列表。Nacos 写仅审批通过后触发并携带 casMd5 乐观锁防丢失更新；纯 DB 操作见 ConfigStore（悲观锁 FOR UPDATE 在复核时保证状态仅迁移一次）。"""
 import asyncio
 import json
 from typing import Any

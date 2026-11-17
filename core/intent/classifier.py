@@ -1,13 +1,4 @@
-"""
-intent/classifier - 查询意图分类推理器（高性能版）
-
-基于 BERT 的二分类（通用知识 / 专业咨询）。为降低在线推理开销，做了以下性能优化：
-1. 模型全局单例，仅加载一次（避免重复 from_pretrained 的开销）。
-2. 支持批量推理 predict_batch：一次 tokenize + 一次前向，显著优于逐条调用。
-3. 结果内存缓存：相同 query 直接命中，跳过模型前向。
-4. 推理用 torch.inference_mode() 关闭梯度与额外开销。
-5. 自动选择 cuda / mps / cpu 设备；GPU 下推理更快。
-"""
+"""查询意图分类推理器（BERT 二分类：通用知识/专业咨询）。全局单例加载、predict_batch 批量推理、结果内存缓存、inference_mode 关闭梯度、自动选 cuda/mps/cpu。"""
 import threading
 
 import torch

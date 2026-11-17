@@ -1,9 +1,4 @@
-"""
-document_processor - 文档处理模块（M2 索引链路）
-
-流程：扫描目录 → 按类型加载 → 语义父块切分 → 递归子块切分 → 输出带父子关系的子块。
-导入路径按本项目结构（core.rag_indexer）组织。
-"""
+"""文档处理（M2 索引链路）：加载 → 语义父块切分 → 递归子块切分 → 输出带父子关系的子块。"""
 import hashlib
 import os
 from datetime import datetime

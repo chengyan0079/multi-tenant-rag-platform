@@ -1,8 +1,4 @@
-"""会话服务：编排 Redis 原文 + PostgreSQL 注册表 + 记忆压缩（compaction）。
-
-对外暴露 create / list / get / append_turn / rename / delete 等业务方法。
-会话仅按 user_id 隔离（user_id 由网关 OAuth 全局唯一下发）。
-"""
+"""会话服务：编排 Redis 原文 + PostgreSQL 注册表 + 记忆压缩。对外暴露 create/list/get/append_turn/rename/delete；仅按 user_id 隔离。"""
 import asyncio
 import re
 from typing import Any

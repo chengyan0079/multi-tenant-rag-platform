@@ -1,14 +1,4 @@
-"""
-milvus_store - 向量存储
-
-集合字段：chunk_id(主键) / tenant_id(分区键) / scope / doc_id / ref_id /
-dense(1024 维, 内积 IP + L2 归一化 == 余弦) / sparse(倒排, 内积)。
-注意：dense 度量由 COSINE 改为 IP（对齐 rag-pro）。已按 COSINE 建索引的旧集合需
-删除后重启服务会自动重建（度量在索引创建时固定，无法原地改），并重新灌库。
-检索时按 tenant_id + scope 过滤，再做 dense、sparse 两路召回并融合。
-使用 pymilvus 的 AsyncMilvusClient，全部 IO 异步，不阻塞事件循环。
-（文档/切片为租户级，不再挂知识库，故无 kb_id 维度。）
-"""
+"""向量存储：集合含 chunk_id(主键)/tenant_id(分区键)/scope/doc_id/ref_id/dense(1024,IP+L2==余弦)/sparse(倒排)。检索按 tenant_id+scope 过滤后 dense+sparse 两路召回融合；AsyncMilvusClient 全异步。dense 度量固定为 IP，旧 COSINE 集合需删后重建。"""
 import asyncio
 import hashlib
 from typing import Any

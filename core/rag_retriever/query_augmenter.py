@@ -1,13 +1,4 @@
-"""
-query_augmenter - 检索增强 / query 改写
-
-在检索前对 query 做变换，提升召回质量，对应 RAGDemo 的 HyDE / 子查询 / 回溯：
-  - DIRECT    直接用原问题检索
-  - HYDE      生成假设性文档，用该文档做向量检索
-  - SUB_QUERY 拆成多个子问题分别检索后合并去重
-  - BACKTRACK 把复杂问题抽象为核心问题再检索
-任一增强结果为空时自动回退 DIRECT，保证检索不空。
-"""
+"""检索增强：检索前改写 query（DIRECT / HYDE / SUB_QUERY / BACKTRACK），任一增强空结果自动回退 DIRECT。"""
 from typing import Any, Literal
 
 from common.config import config

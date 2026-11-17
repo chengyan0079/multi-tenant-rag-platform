@@ -1,26 +1,4 @@
-"""
-nacos_config - Nacos 3.x 配置中心客户端（直连 Open API）
-
-与服务发现（app/managers/nacos_discover_manager.py，namespace=public）完全独立：
-- 命名空间：config.NACOS_CONFIG_NAMESPACE（**填命名空间 ID，不是显示名**；默认见 common/config.py，部署用 .env 覆盖）
-- 变量：config.NACOS_CONFIG_*（与 NACOS_* 分离）
-
-Nacos 3.x API 约定（仅 3.x，不做版本兼容）：
-- 前缀 /nacos/v3，读/写/列/历史统一走 admin 路径 /v3/admin/cs/config(+/list|/history/list)
-  （client 只读接口 /v3/client/cs/config 需应用级身份，本部署未启用，故统一用 admin）
-- 参数驼峰：namespaceId / groupName / dataId
-- 响应包裹在 data 字段，成功业务码 code=0（message "success"），不存在返回 code=20004
-- 历史记录主键为 id（归一到 nid 以兼容上层）
-
-设计要点（见 docs/配置中心对接设计.md）：
-- 读类（命名空间列表 / 配置列表 / 配置详情 / 历史）直连 Nacos，无副作用。
-- 写类（publish / remove / rollback）仅在审批通过后由 ConfigChangeService 调用，
-  并携带 casMd5 做乐观锁，防止基于过期基准的覆盖写（lost update）。
-- 历史/当前态以 Nacos 为准，不本地冗余。
-
-实现：基于 requests 同步调用（FastAPI 异步侧用 asyncio.to_thread 包裹），
-Nacos Open API 对 casMd5 / history / rollback 的参数控制比 nacos-sdk 更直接。
-"""
+"""Nacos 3.x 配置中心客户端（直连 Open API，与发现端独立）。仅 3.x：前缀 /nacos/v3、admin 路径、参数驼峰、code=0 成功/20004 不存在；写操作仅审批后由 ConfigChangeService 调用并携带 casMd5。基于同步 requests，异步侧包 to_thread。"""
 import uuid
 from typing import Any
 

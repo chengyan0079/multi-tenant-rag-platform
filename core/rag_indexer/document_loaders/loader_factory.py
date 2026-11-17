@@ -1,10 +1,4 @@
-"""
-loader_factory - 文档加载器工厂
-
-说明：创建型模式，按扩展名路由到适配的 Loader。
-
-Author: 骆昊
-"""
+"""文档加载器工厂：按扩展名路由到对应 Loader。"""
 from pathlib import Path
 from typing import Type
 

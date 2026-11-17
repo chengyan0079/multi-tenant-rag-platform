@@ -1,8 +1,4 @@
-"""
-loader_pdf - PDF 文档加载器（文本 + 嵌入图片 OCR）
-
-Author: 骆昊
-"""
+"""PDF 加载器：提取文本并对嵌入图片做 OCR。"""
 from io import BytesIO
 from typing import Iterator
 import cv2

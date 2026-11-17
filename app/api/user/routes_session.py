@@ -1,12 +1,7 @@
-"""会话（多轮，用户侧）（§17.2）
+"""多轮会话接口（用户侧）。
 
-会话由 RAG_ULTRA 服务端生成 session_id，仅绑定 user_id；
-同一用户可拥有多个会话，所有读写按 (用户, 会话) 隔离，跨用户不可见。
-user_id 由网关 OAuth 后全局唯一下发（跨租户不重复），故无需再叠加 tenant_id。
-user_id 由网关 OAUTH 后下发的 X-User-Id 透传，不从请求体传入（防伪造）。
-
-会话实体与会话记忆由独立模块 core.session / core.session_memory 承载。
-请求体 / 响应 data 结构统一见 app.api.schemas。
+会话由服务端生成 session_id，仅绑定 user_id（网关 OAuth 下发，跨租户唯一），读写按 (用户, 会话) 隔离。
+记忆与会话实体由 core.session / core.session_memory 承载。
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 

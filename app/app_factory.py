@@ -1,17 +1,4 @@
-"""
-app_factory - FastAPI 应用工厂（uvicorn factory 模式，多进程安全）
-
-每个 worker 进程各自调用 create_app()：构建 AppServer、按 stage 注册各启动项 Manager、
-挂载路由，并在 lifespan 内按阶段启动 / 逆序释放这些 Manager（任一失败即记 "启动失败" 日志）。
-
-启动分 stage（同 stage 内 asyncio.gather 并发，stage 间按序）：
-  stage 0：Logging（奠基）
-  stage 1：Redis / PostgreSQL / Model / FileProvider（相互独立，并发）
-  stage 2：Milvus(依赖 Model) / FaqCache(依赖 Redis+PostgreSQL) / NacosConfig(依赖 Redis)
-  stage 3：NacosDiscover（服务注册，最后）
-
-配置为 common.config 单例，已由 app_state.settings 暴露，无需单独 ConfigManager。
-"""
+"""FastAPI 应用工厂（uvicorn factory 模式，多进程安全）。每个 worker 调 create_app()：构建 AppServer、注册各 Manager、挂载路由，lifespan 内按 stage 启动/逆序释放。stage: 0 Logging→1 Redis/PG/Model/FileProvider(并发)→2 Milvus/FaqCache/NacosConfig→3 NacosDiscover。"""
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
@@ -28,6 +15,8 @@ from app.managers.redis_manager import RedisManager
 from app.managers.postgres_manager import PostgresManager
 from app.managers.faq_cache_manager import FaqCacheManager
 from app.managers.milvus_manager import MilvusManager
+from app.managers.neo4j_manager import Neo4jManager
+from app.managers.graph_build_manager import GraphBuildManager
 from app.managers.model_manager import ModelManager
 from app.managers.file_provider_manager import FileProviderManager
 from app.managers.nacos_config_manager import NacosConfigManager
@@ -46,9 +35,11 @@ def build_server() -> AppServer:
     server.register(MilvusManager(), order=55, stage=2)             # 依赖 Model（stage 在其后）
     server.register(FileProviderManager(), order=60, stage=1)       # 基础组件
     server.register(FaqCacheManager(), order=65, stage=2)           # 依赖 Redis+PostgreSQL
+    server.register(Neo4jManager(), order=70, stage=2)              # 图路侧车，GRAPH_ENABLED 时连接
     server.register(NacosConfigManager(), order=105, stage=2)       # 依赖 Redis
     server.register(NacosDiscoverManager(), order=110, stage=3)     # 服务注册
     server.register(IndexManager(), order=115, stage=3)             # 后台消费（仅起协程，不阻塞）
+    server.register(GraphBuildManager(), order=118, stage=3)        # 定时建图（依赖 Neo4j/PG）
     server.register(MCPApiManager(), order=120, stage=3)            # 需路由已挂载，最后
     return server
 
