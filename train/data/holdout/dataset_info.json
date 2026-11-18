@@ -1,0 +1,18 @@
+{
+  "fault_extract_holdout": {
+    "file_name": "holdout/train.json",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output"
+    }
+  },
+  "fault_extract_holdout_eval": {
+    "file_name": "holdout/eval.json",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output"
+    }
+  }
+}

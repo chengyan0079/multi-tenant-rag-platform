@@ -1,0 +1,26 @@
+{
+  "seed": 42,
+  "scene_total": 20,
+  "holdout_scenes": [
+    "wait_timeout 调低致长连接失效",
+    "主从切换致连接错误峰值与会话丢失",
+    "发布引入无淘汰缓存致 OOM",
+    "缓存驱逐致命中率崩塌请求穿透",
+    "页面缓存不足致图谱查询变慢"
+  ],
+  "train_records": 150,
+  "eval_records": 20,
+  "train_scenes": 15,
+  "eval_scenes": 5,
+  "train_severity": {
+    "P1": 90,
+    "P2": 50,
+    "P3": 10
+  },
+  "eval_severity": {
+    "P2": 8,
+    "P1": 8,
+    "P3": 4
+  },
+  "scene_overlap": 0
+}

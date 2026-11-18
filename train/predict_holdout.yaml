@@ -1,0 +1,60 @@
+### 预测配置：在场景级留出集上评一次（训练结束后单独跑）
+### 用法：llamafactory-cli train train/predict_holdout.yaml
+### 注意：dataset_dir 必须指向「已注册 fault_extract_holdout_eval 的那份 dataset_info.json」所在目录
+###       LLaMA-Factory 默认 data/，若你把声明合并进了它自带的 data/dataset_info.json 就不用改
+
+### ===== 模型与适配器 =====
+model_name_or_path: Qwen/Qwen2.5-1.5B-Instruct
+# 改成你训练实际落盘的目录（WebUI 训练默认是 saves/<model>/lora/train_<时间>，
+# 不是本仓库 yaml 里的 saves/qwen2.5-1.5b-lora-fault-extract）
+adapter_name_or_path: saves/Qwen2.5-1.5B-Instruct/lora/train_2026-11-17-23-55
+template: qwen
+trust_remote_code: true
+infer_backend: huggingface
+
+### ===== 微调方式（与训练一致）=====
+stage: sft
+finetuning_type: lora
+lora_rank: 16
+lora_alpha: 32
+lora_dropout: 0.05
+lora_target: all
+
+### ===== 数据：5 类未见场景 20 条 =====
+# dataset_dir: data
+eval_dataset: fault_extract_holdout_eval
+cutoff_len: 1024
+max_samples: 64
+overwrite_cache: true
+preprocessing_num_workers: 4
+
+### ===== 生成 =====
+do_predict: true
+predict_with_generate: true
+# 贪心解码：评测要可复现，不开采样
+do_sample: false
+num_beams: 1
+# 标注 output 约 616 字符（≈400 token），留足余量避免截断被误判为字段缺失
+max_new_tokens: 640
+batch_size: 1
+
+### ===== 输出 =====
+# 显式写死，别再让 WebUI 拼路径：产物固定落在这里
+#   saves/predict_holdout/generated_predictions.jsonl
+#   saves/predict_holdout/predict_results.json
+output_dir: saves/predict_holdout
+overwrite_output_dir: true
+report_to: none
+bf16: true
+
+### 产出两个文件：
+###   saves/predict_holdout/predict_results.json        ← BLEU-4 / ROUGE 等表层指标（只作对照，不写进简历）
+###   saves/predict_holdout/generated_predictions.jsonl ← 逐条预测，交给 train/score_fields.py 算真实指标：
+###   python train/score_fields.py --gold train/data/holdout/eval.json \
+###       --predictions saves/predict_holdout/generated_predictions.jsonl \
+###       --out train/data/holdout/score_holdout.json
+###
+### 找不到 generated_predictions.jsonl 时（WebUI 的 Predict 页会把 output_dir 换成
+### saves/<model>/lora/predict_<时间>），直接用独立脚本重生成，不再依赖目录猜测：
+###   python train/run_predict.py --model <base> --adapter <train_<时间>> \
+###       --gold train/data/holdout/eval.json --out train/data/holdout/generated_predictions.jsonl

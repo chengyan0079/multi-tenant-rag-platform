@@ -1,0 +1,68 @@
+### ===== 模型 =====
+model_name_or_path: Qwen/Qwen2.5-1.5B-Instruct
+trust_remote_code: true
+
+### ===== 微调方式：LoRA =====
+stage: sft
+do_train: true
+finetuning_type: lora
+# 结构化 JSON 抽取要同时覆盖 8 个字段与长数组，r=8 容量偏紧；alpha 取 2r
+lora_rank: 16
+lora_alpha: 32
+# 训练样本只有 150 条，必须靠 dropout 抑制过拟合
+lora_dropout: 0.05
+# all = 全部线性层（q/k/v/o + gate/up/down），比只挂 q/v 收敛更快
+lora_target: all
+
+### ===== 数据 =====
+# 数据集需先在 LLaMA-Factory 的 data/dataset_info.json 中注册
+# 声明文件见 train/data/holdout/dataset_info.json
+dataset: fault_extract_holdout
+# 实测样本最长约 923 token（P95 916），1024 足够；填 2048 会让每条样本一半是 padding
+cutoff_len: 1024
+max_samples: 1000
+overwrite_cache: true
+preprocessing_num_workers: 4
+dataloader_num_workers: 2
+template: qwen
+# 结构化输出任务不打包，避免多条样本首尾相接导致 JSON 边界混淆
+packing: false
+
+### ===== 输出 =====
+output_dir: saves/qwen2.5-1.5b-lora-fault-extract
+logging_steps: 5
+save_strategy: epoch
+save_total_limit: 3
+plot_loss: true
+overwrite_output_dir: true
+report_to: none
+
+### ===== 训练超参 =====
+# 有效批次 = 4 × 2 = 8 → 150 条每轮 19 步，8 轮共 152 步（与 checkpoint-152 一致）
+per_device_train_batch_size: 4
+gradient_accumulation_steps: 2
+# LoRA 用 1e-4 量级；1e-2 会在几十步内把输出格式打崩
+learning_rate: 1.0e-4
+# 实测（2026-11-17）：step 60/3.2 轮 loss 0.022 → step 80/4.3 轮 0.0016 → 末步 8.0 轮 0.0021，
+# 后 4 轮 70 步无下降，属模板记忆。下一轮改 4.0 可省一半时间，指标预期持平。
+num_train_epochs: 8.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+weight_decay: 0.0
+max_grad_norm: 1.0
+bf16: true
+gradient_checkpointing: true
+optim: adamw_torch
+# 只在 output 上算 loss，instruction 与 input 不参与（默认即 false，显式写出便于复核）
+train_on_prompt: false
+
+### ===== 评测 =====
+# 刻意不在训练期挂留出集：只有 20 条，用它选 checkpoint 等于把留出集用于调参，
+# 指标会再次偏乐观。留出集只在训练结束后评一次。
+eval_strategy: "no"
+# eval_dataset: fault_extract_holdout_eval
+# per_device_eval_batch_size: 4
+# eval_strategy: epoch
+
+### ===== 预测（训练完成后单独跑，输出到指定文件）=====
+# do_predict / predict_with_generate 由 llamafactory-cli 单独调用，不写在本训练配置里
