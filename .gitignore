@@ -143,16 +143,5 @@ cython_debug/
 .idea/
 
 
-# 项目忽略
-models/
-.codebuddy/
-memory/
-logs/
-demo/
-data/
-tmp/
-mcp_demo/
-docs/
-.cw_skill/
-!train/data/
+
 
