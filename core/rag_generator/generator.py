@@ -12,14 +12,16 @@ from langchain_openai import ChatOpenAI
 
 from common.config import config
 from common.logger import logger
-from core.config_center.prompts_manager import RAGPromptsManager
+from core.config_center.prompts_manager import PromptManager
 from core.rag_generator.assembly import assemble_question
 from core.rag_retriever.retriever import RetrievedChunk
 from store.session_store import SessionStore
 from core.session_memory.memory_service import MemoryService
 
+GENERATION_FALLBACK = '抱歉，生成答案时发生错误。'
+
 # 提示词本体已迁移到 Nacos 配置中心 PROMPT 组（data_id=CORE_RAG_TEMPLATE 等），
-# 运行时由 RAGPromptsManager 按 "先 Redis 再 Nacos" 读取。下方为 Nacos 不可达时的兜底模板，
+# 运行时由 PromptManager 按 "先 Redis 再 Nacos" 读取。下方为 Nacos 不可达时的兜底模板，
 # 避免生成链路整体不可用。
 # 注意：通用知识走"空上下文直答"，故模板需允许"上下文为空/不足时用自身知识回答"；
 # Nacos 中的 CORE_RAG_TEMPLATE 应保持同一语义（勿写成"无上下文即拒绝回答"）。
@@ -62,7 +64,7 @@ class Generator:
         提示词读取是同步的 Redis/Nacos 调用，用 to_thread 避免阻塞事件循环。
         """
         try:
-            return await asyncio.to_thread(RAGPromptsManager.core_rag_prompt)
+            return await asyncio.to_thread(PromptManager.core_rag_prompt)
         except Exception:  # noqa: BLE001
             logger.warning('直接回答提示词读取失败，使用内置兜底模板')
             from langchain_core.prompts import PromptTemplate
@@ -139,7 +141,7 @@ class Generator:
             return await chain.ainvoke({"question": question, "chunks": chunks})
         except Exception as e:
             logger.error(f'生成失败: {e}', exc_info=True)
-            return '抱歉，生成答案时发生错误。'
+            return GENERATION_FALLBACK
 
     async def astream(
         self,
@@ -166,4 +168,4 @@ class Generator:
                     yield piece
         except Exception as e:
             logger.error(f'流式生成失败: {e}', exc_info=True)
-            yield '抱歉，生成答案时发生错误。'
+            yield GENERATION_FALLBACK

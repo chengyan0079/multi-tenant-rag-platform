@@ -8,7 +8,7 @@ X-Trace-Id 透传全链路，并在响应头回写。
 角色鉴权也由网关承担，本服务只消费网关下发的租户/用户上下文，不在服务内做角色判断。
 
 未对接 Java 网关前（IDENTITY_DEFAULT_ENABLED=True）：请求未带身份头时兜底为
-DEFAULT_TENANT_ID / DEFAULT_USER_ID，方便本地自测；网关接入后关掉该开关即恢复"缺头即拒"。
+DEFAULT_TENANT_ID / DEFAULT_USER_ID；网关接入后关掉该开关即恢复"缺头即拒"。
 """
 from fastapi import Depends, Header, HTTPException
 

@@ -149,6 +149,8 @@ async def collect_nacos_changes(client: Any, tenant_id: int) -> GraphSnapshot:
 async def collect_config_requests(session: Any, tenant_id: int) -> GraphSnapshot:
     """读 rag_config_change_request（已执行），写 Change（source=structured）。"""
     snap = GraphSnapshot(tenant_id)
+    # 配置审批表无 tenant_id（系统级配置），所有租户看到同一份变更记录；
+    # 按当前租户建 Change 节点，让该租户的因果链能引用系统级变更。
     rows = (await session.execute(_text(
         'SELECT id, data_id, title, created_at FROM rag_config_change_request '
         'WHERE status = 3 ORDER BY created_at DESC LIMIT 50'
@@ -258,11 +260,11 @@ def main() -> None:
             await store.close()
             await engine.dispose()
 
+    asyncio.run(run())
+
 
 async def _empty() -> list:
     return []
-
-    asyncio.run(run())
 
 
 if __name__ == '__main__':

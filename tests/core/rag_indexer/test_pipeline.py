@@ -35,11 +35,10 @@ def test_build_index_assembles_and_stores(idx_env, monkeypatch):
         _doc('b text', 'c1', 'p0', 'parent0'),
     ])
     saved = []
-    async def fake_save(tenant_id, doc_id, scope, chunks, version=1):
+    async def fake_save(tenant_id, doc_id, scope, chunks):
         saved.append((tenant_id, doc_id, scope, chunks))
-        return len(chunks)
+        return 1, len(chunks)
     monkeypatch.setattr(pipeline.DocDao, 'save_chunks', staticmethod(fake_save))
-    monkeypatch.setattr(pipeline.DocDao, 'next_version', staticmethod(AsyncMock(return_value=1)))
     monkeypatch.setattr(pipeline.DocDao, 'chunk_ids_of_version', staticmethod(AsyncMock(return_value=[])))
 
     n = asyncio.run(pipeline.build_index(100, 7, 'oss-k', 'f.pdf', scope=0))
@@ -59,7 +58,7 @@ def test_build_index_empty(idx_env, monkeypatch):
     monkeypatch.setattr(pipeline, 'process_documents', lambda _d: [])
     saved = []
     monkeypatch.setattr(pipeline.DocDao, 'save_chunks', staticmethod(
-        lambda *a, **k: (saved.append(a) or 0)))
+        lambda *a, **k: (saved.append(a) or (1, 0))))
     n = asyncio.run(pipeline.build_index(1, 2, 'k', 'f', scope=1))
     assert n == 0
     assert not saved  # 空内容不落库
@@ -79,16 +78,23 @@ def test_enqueue_fallback(idx_env, monkeypatch):
     from core.rag_indexer import pipeline
     app_state.redis = None
     recorded = []
-    monkeypatch.setattr(asyncio, 'create_task', lambda c: recorded.append(c))
+
+    def _fake_create(coro):
+        recorded.append(coro)
+        task = asyncio.get_running_loop().create_task(asyncio.sleep(0))
+        coro.close()  # 被测 coroutine 只验证投递，不实际执行
+        return task
+
+    monkeypatch.setattr(asyncio, 'create_task', _fake_create)
     asyncio.run(pipeline.enqueue_index(1, 2, 'k', 'f', 0))
     assert len(recorded) == 1  # 降级走 create_task
-    recorded[0].close()  # 避免 coroutine never awaited 警告
+    assert len(pipeline._background_tasks) == 0  # done callback 已清理引用
 
 
 def test_run_index_job_success(idx_env, monkeypatch):
     from core.rag_indexer import pipeline
     states = []
-    async def fake_update(doc_id, status, **kw):
+    async def fake_update(tenant_id, doc_id, status, **kw):
         states.append((status, kw))
     monkeypatch.setattr(pipeline.DocDao, 'update_status', staticmethod(fake_update))
     monkeypatch.setattr(pipeline, 'build_index', AsyncMock(return_value=5))
@@ -100,7 +106,7 @@ def test_run_index_job_success(idx_env, monkeypatch):
 def test_run_index_job_fail(idx_env, monkeypatch):
     from core.rag_indexer import pipeline
     states = []
-    async def fake_update(doc_id, status, **kw):
+    async def fake_update(tenant_id, doc_id, status, **kw):
         states.append((status, kw))
     monkeypatch.setattr(pipeline.DocDao, 'update_status', staticmethod(fake_update))
     async def boom(*a, **k):
@@ -115,7 +121,7 @@ def test_run_index_job_review_triggers_graph(idx_env, monkeypatch):
     """doc_type=2 时索引成功后触发入图，scope 仍按普通文档为 0。"""
     from core.rag_indexer import pipeline
     states, scopes = [], []
-    async def fake_update(doc_id, status, **kw):
+    async def fake_update(tenant_id, doc_id, status, **kw):
         states.append(status)
     async def fake_build(tid, did, key, name, scope=0):
         scopes.append(scope)
@@ -134,7 +140,7 @@ def test_run_index_job_graph_failure_not_fail_index(idx_env, monkeypatch):
     """入图失败只告警，不改索引完成状态。"""
     from core.rag_indexer import pipeline
     states = []
-    async def fake_update(doc_id, status, **kw):
+    async def fake_update(tenant_id, doc_id, status, **kw):
         states.append(status)
     async def boom(*a, **k):
         raise RuntimeError('graph boom')

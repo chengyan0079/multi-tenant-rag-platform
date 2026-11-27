@@ -5,7 +5,7 @@
 | 文件 | 用途 |
 |---|---|
 | `gen_schema_pg.py` | 依据 `store/orm_models` 生成 `schema_postgresql.sql`（PostgreSQL 建表脚本，模型变更后重跑以同步） |
-| `gen_auth_headers.py` | 生成调用方签名头（自测/联调用，扮演网关角色；见 `core/auth`） |
+| `gen_auth_headers.py` | 生成调用方签名头（按网关签名规则生成，用于接口调用；见 `core/auth`） |
 | `schema_postgresql.sql` | PostgreSQL 建表基准（由 `gen_schema_pg.py` 自动生成，请勿手改） |
 
 > Milvus 的数据库与向量集合由**服务启动时自动创建**（`app/managers/milvus_manager.py`：缺失则建、有则加载，幂等），无需单独的初始化脚本。
@@ -20,11 +20,11 @@ psql -h127.0.0.1 -U postgres -d rag_ultra -f scripts/schema_postgresql.sql
 # 改了 ORM 模型后，重新生成建表脚本
 python scripts/gen_schema_pg.py
 
-# 生成调用方签名头（自测：开启 AUTH_HMAC_ENABLED 后用这些头请求接口）
-# 方式一：直接运行，改文件顶部 DEMO_* 常量（IDE 右键 Run）
+# 生成调用方签名头（启用 AUTH_HMAC_ENABLED 后，用输出的头请求接口）
+# 直接运行，默认值取自配置
 python scripts/gen_auth_headers.py
 
-# 方式二：命令行传参（优先级高于 DEMO_*）
+# 命令行传参覆盖默认值
 python scripts/gen_auth_headers.py --method GET --path /v1/faq --tenant 100 --user 1001
 ```
 

@@ -86,7 +86,8 @@ def confidence_of(results: list[dict[str, Any]]) -> float:
     comparable = [f for f in _COMPARABLE_FIELDS
                   if any(_get(r, f) is not None for r in valid)]
     if not comparable:
-        return 1.0
+        # 三次采样都没抽出可比字段，不能当满分；否则空结果会被闸门判 high 写进图
+        return 0.0
     hits = sum(1 for f in comparable
                if len({json.dumps(_get(r, f), ensure_ascii=False, sort_keys=True) for r in valid}) == 1)
     return round(hits / len(comparable), 4)

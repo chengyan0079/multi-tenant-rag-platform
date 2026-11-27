@@ -1,10 +1,7 @@
-"""健康检查 DAO（store 数据访问层）：聚合 Redis / PostgreSQL / Milvus / Model / MCP / Nacos 探活。
+"""健康检查 DAO：聚合 Redis / PostgreSQL / Milvus / Model / MCP / Nacos 等组件状态。
 
 返回原始探活结果（dict）；响应模型 HealthData 由路由层组装，故本模块不依赖 app.api.schemas。
-
-探活原则：只读内存状态，不发网络请求——探活接口会被 Nacos 高频调用，
-每次都打一次外部请求会把探活放大成压力；各组件"是否连上"由各自的 Manager 在
-启动/运行时维护状态，这里只做汇总。
+除 Redis/PostgreSQL/Milvus 做真实探测外，其余组件取 Manager 维护的内存状态。
 """
 from app.app_state import app_state
 
@@ -37,7 +34,7 @@ def _config_center_ok() -> bool:
 
 
 def _graph_ok() -> bool:
-    """故障图谱是否就绪：Neo4jManager 连接成功后注入 store（图是侧车，不影响 status）。"""
+    """故障图谱是否就绪：Neo4jManager 连接成功后注入 store。"""
     return app_state.neo4j_store is not None and app_state.neo4j_store.driver is not None
 
 

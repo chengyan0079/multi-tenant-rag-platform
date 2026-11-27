@@ -51,7 +51,7 @@ def test_confidence_null_fields_excluded_from_denominator():
 
 def test_confidence_empty_results():
     assert el.confidence_of([]) == 0.0
-    assert el.confidence_of([{}, {}]) == 1.0
+    assert el.confidence_of([{}, {}]) == 0.0  # 无可比字段不能判满分，否则空结果自动入图
 
 
 def test_decide_gates():

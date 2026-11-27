@@ -5,8 +5,7 @@ from typing import Type
 from langchain_core.document_loaders import BaseLoader
 from langchain_core.documents import Document
 
-from common.config import config
-from common.logger import logger, setup_logging
+from common.logger import logger
 from core.rag_indexer.document_loaders.loader_docx import OCRDocxLoader
 from core.rag_indexer.document_loaders.loader_image import OCRImageLoader
 from core.rag_indexer.document_loaders.loader_markdown import FastMarkdownLoader
@@ -55,12 +54,3 @@ class DocumentLoaderFactory:
         """判断指定文件格式是否在支持的加载列表内"""
         ext = Path(file_path).suffix.lower()
         return ext in cls.SUPPORTED_LOADERS
-
-
-if __name__ == '__main__':
-    setup_logging()
-    thy_file = str(config.FILES_DIR / 'LLM基础知识.pdf')
-    if DocumentLoaderFactory.is_supported(thy_file):
-        docs = DocumentLoaderFactory.load_document(thy_file)
-        logger.info(f'成功加载，文档页数/片段数: {len(docs)}')
-        logger.info(docs[0].page_content)

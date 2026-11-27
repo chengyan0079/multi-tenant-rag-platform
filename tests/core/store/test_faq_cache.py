@@ -1,10 +1,4 @@
-"""
-test_faq_cache - FAQ 字面精确匹配纯逻辑单测（pytest + mock）
-
-仅测试不依赖 Redis/数据库的纯函数：match_faq / _parse_similar / _normalize / _tokenize / bm25_match。
-用 asyncio.run 包裹（本模块无异步纯函数，仅保持与项目单测约定一致）。
-"""
-import asyncio
+"""FAQ 字面精确匹配纯逻辑单测：match_faq / _parse_similar / _normalize / _tokenize / bm25_match。"""
 import os
 import sys
 
@@ -82,8 +76,3 @@ def test_bm25_match_hits_above_threshold():
     # 高于阈值 / 完全不相关 → 不命中
     assert fc.bm25_match(items, "Python编程怎么入门学习", 9999.0, tenant_id=1) is None
     assert fc.bm25_match(items, "运费多少", 1.0, tenant_id=1) is None
-
-
-if __name__ == "__main__":
-    asyncio.run(asyncio.sleep(0))  # 保持模块可执行占位
-    print("faq_cache 纯逻辑单测通过")

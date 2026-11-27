@@ -65,35 +65,22 @@ async def chat(req: ChatRequest, tenant_id: int = Depends(resolve_tenant)):
     if user_id and session_id:
         await clear_chat_stop(user_id, session_id)
 
+    async def stop_requested() -> bool:
+        return bool(user_id and session_id and await is_chat_stopped(user_id, session_id))
+
     async def event_gen():
-        source = None
-        full_answer: list[str] = []
-        stopped = False
         try:
             async for event, payload in router_.answer_stream(
                 query=req.query, tenant_id=tenant_id, user_id=user_id,
-                session_id=session_id,
+                session_id=session_id, stop_check=stop_requested,
             ):
-                # 停止检查：每个事件产出前检查取消标记（Redis，跨 worker 生效）
-                if user_id and session_id and await is_chat_stopped(user_id, session_id):
-                    stopped = True
-                    break
-                if event == "meta":
-                    source = payload.get("source")
-                elif event in ("answer", "token"):
-                    full_answer.append(payload if isinstance(payload, str) else "")
                 yield {"event": event, "data": json.dumps(payload, ensure_ascii=False)}
         except Exception as e:  # noqa: BLE001
             logger.exception(f"对话流式输出异常: {e}")
             yield {"event": "error", "data": json.dumps({"msg": "服务内部错误"}, ensure_ascii=False)}
-            return
         finally:
             if user_id and session_id:
                 await clear_chat_stop(user_id, session_id)
-
-        if stopped:
-            yield {"event": "stopped", "data": json.dumps({"msg": "已停止"}, ensure_ascii=False)}
-            yield {"event": "done", "data": "{}"}
 
         # 历史回写由 QARouter._persist_session 统一负责（含问答明细落库），
         # 此处不再重复追加，否则一轮会产生 4 条会话元素。

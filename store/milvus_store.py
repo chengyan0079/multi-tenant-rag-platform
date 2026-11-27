@@ -11,7 +11,7 @@ from pymilvus import (
 )
 
 from common.config import config
-from common.logger import logger, setup_logging
+from common.logger import logger
 from core.rag_model.model_service import ModelService
 
 
@@ -27,7 +27,7 @@ def _parse_sparse_row(sparse_matrix: Any, index: int) -> dict[int, float]:
 
 
 def _l2_normalize(vec: Any):
-    """L2 归一化稠密向量：使内积(IP)等价于余弦(COSINE)，与 rag-pro 的 IP 度量对齐。
+    """L2 归一化稠密向量：使内积(IP)等价于余弦(COSINE)。
 
     写入(add_chunks)与查询(hybrid_search)都归一化，保证两侧一致；已归一化则为恒等操作。
     """
@@ -107,7 +107,7 @@ class MilvusStore:
             index_params = self.client.prepare_index_params()  # 本地构建，同步无需 await
             index_params.add_index(
                 field_name='dense', index_name='dense_index',
-                index_type='HNSW', metric_type='IP',  # IP + 归一化 == 余弦（对齐 rag-pro）
+                index_type='HNSW', metric_type='IP',  # IP + 归一化 == 余弦
                 params={'M': 16, 'efConstruction': 128},
             )
             index_params.add_index(
@@ -212,11 +212,3 @@ class MilvusStore:
         expr = f'chunk_id in {list(chunk_ids)}'
         await self.client.delete(collection_name=config.MILVUS_COLLECTION, expr=expr)
         logger.info(f'删除向量实体 {len(chunk_ids)} 条')
-
-
-if __name__ == '__main__':
-    setup_logging()
-    store = MilvusStore()
-    # store.bind(client, ModelService())
-    # hits = asyncio.run(store.hybrid_search('学习AI大模型课程能够掌握哪些核心竞争力？', scope=0, tenant_id=1))
-    # print(hits)

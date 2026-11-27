@@ -1,4 +1,5 @@
 """检索编排：父子块去重 + 高亮，支持 scope(doc/faq)、RRF 融合、Rerank 重排（失败降级 RRF）。"""
+import asyncio
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -108,8 +109,10 @@ class Retriever:
         # 有重排模型时做精排；失败则降级为只用 RRF 融合结果
         if rerank and self.model and self.model.reranker is not None:
             try:
-                rerank_results = self.model.rerank(
-                    query=query, documents=[p['content'] for p in parents], top_k=top_k
+                # rerank 是同步阻塞调用，丢线程池避免卡住事件循环
+                rerank_results = await asyncio.to_thread(
+                    self.model.rerank,
+                    query=query, documents=[p['content'] for p in parents], top_k=top_k,
                 )
                 chunks: list[RetrievedChunk] = []
                 for res in rerank_results:

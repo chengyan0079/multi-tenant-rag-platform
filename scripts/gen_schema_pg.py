@@ -60,11 +60,6 @@ HEADER = """-- ============================================================
 --     rag_document 为“解析/索引”记录，经 file_upload_id 引用上传版本，不重复文件元数据。
 -- 说明：列默认值由 ORM 在写入时提供（Python 侧 default），故 DDL 不含服务器端 DEFAULT。
 --
--- 与 MySQL 版的语法差异（MySQL 版已废弃）：
---   - 注释用 COMMENT ON（PG 无行内 COMMENT 语法）；
---   - MEDIUMTEXT -> TEXT；
---   - 自增主键 BIGINT AUTO_INCREMENT -> BIGSERIAL；
---   - JSON 列编译为 JSON；若需要 JSONB（支持索引/GIN），可自行替换类型。
 -- ============================================================
 
 -- 建库（库名与 .env 的 POSTGRES_DATABASE 对齐即可；已有库或库名不同则跳过本句）

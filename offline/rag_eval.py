@@ -5,14 +5,11 @@ import json
 import sys
 from typing import Any
 
-from dotenv import load_dotenv
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
 from common.config import config
 from common.logger import logger, setup_logging
-
-load_dotenv(dotenv_path=config.BASE_DIR / '.env', override=True)
 
 
 def _build_clients() -> tuple[AsyncOpenAI, AsyncOpenAI]:
@@ -57,7 +54,7 @@ class EvalResult(BaseModel):
 
 
 async def run_evaluation(row: dict[str, Any]) -> EvalResult:
-    """对单条样本计算指标（参考 rag-pro 的 experiment 算子写法，指标并发打分）。
+    """对单条样本计算指标（并发打分）。
 
     row 需含 user_input / response / retrieved_contexts；reference 可选。
     缺 reference 时只跑 Faithfulness + AnswerRelevancy（另两项需 ground truth）。

@@ -7,7 +7,7 @@ from langchain_core.document_loaders import BaseLoader
 from langchain_core.documents import Document
 
 from common.config import config
-from common.logger import logger, setup_logging
+from common.logger import logger
 
 
 class UTF8TextLoader(BaseLoader):
@@ -77,11 +77,3 @@ class UTF8TextLoader(BaseLoader):
         except Exception as e:
             logger.error(f'终极读取兜底失败 [{self.file_path.name}]: {e}', exc_info=True)
             return None
-
-
-if __name__ == '__main__':
-    setup_logging()
-    text_loader = UTF8TextLoader(str(config.FILES_DIR / '数据库和SQL完整笔记.txt'))
-    docs = text_loader.load()
-    logger.info(type(docs), len(docs))
-    logger.info(docs[0].page_content)

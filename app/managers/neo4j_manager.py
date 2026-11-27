@@ -15,7 +15,7 @@ class Neo4jManager(Manager):
         try:
             await store.connect()
             await store.ensure_schema()
-        except Exception as e:  # noqa: BLE001  图是侧车，不可用不影响主链路
+        except Exception as e:  # noqa: BLE001  图路是扩展能力，不可用不影响主链路
             logger.warning(f'Neo4j 连接/初始化失败，图路降级为不可用: {e}')
             await store.close()
             return

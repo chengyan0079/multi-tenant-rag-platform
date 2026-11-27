@@ -1,9 +1,4 @@
-"""
-test_assembly - 多轮上下文装配单测（pytest）
-
-覆盖设计方案 docs/上下文压缩设计方案.md §4：
-记忆独立成块、按句截断、冗余去重、history 截取、memory 压缩与配额模型。
-"""
+"""多轮上下文装配单测：记忆独立成块、按句截断、冗余去重、history 截取与配额。"""
 import os
 import sys
 

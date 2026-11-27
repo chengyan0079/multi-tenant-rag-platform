@@ -1,13 +1,12 @@
 """基于 BGE-M3 的长文本语义切分器。"""
 from pathlib import Path
-from typing import Any
 
 from langchain_core.documents import Document
 from langchain_experimental.text_splitter import SemanticChunker
 from langchain_huggingface import HuggingFaceEmbeddings
 
 from common.config import config
-from common.logger import logger, setup_logging
+from common.logger import logger
 
 
 class BgeSemanticSplitter:

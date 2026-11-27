@@ -64,8 +64,12 @@ def test_ensure_collection_loads_when_exists() -> None:
 
 
 def _import_funcs():
-    mod = _import_mod()
-    return mod
+    """模块级工具函数（_build_filter_expr / stable_chunk_id）不在 MilvusStore 类上。"""
+    try:
+        from store import milvus_store
+        return milvus_store
+    except ImportError:
+        pytest.skip("pymilvus 不可用，跳过 Milvus 测试")
 
 
 def test_build_filter_expr_base_only() -> None:

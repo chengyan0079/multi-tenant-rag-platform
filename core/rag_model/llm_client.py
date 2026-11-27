@@ -10,7 +10,6 @@ from langchain_openai import ChatOpenAI
 
 
 def build_llm(*, temperature: float = 0.0, max_tokens: int = 512, streaming: bool = False) -> ChatOpenAI:
-    """构造一个 OpenAI 兼容的 ChatOpenAI 客户端（按平台配置）。"""
     return ChatOpenAI(
         model=config.LLM_MODEL_NAME,
         api_key=config.LLM_API_KEY,

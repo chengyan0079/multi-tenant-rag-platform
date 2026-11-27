@@ -7,8 +7,7 @@ from PIL import Image
 from langchain_core.document_loaders import BaseLoader
 from langchain_core.documents import Document
 
-from common.config import config
-from common.logger import logger, setup_logging
+from common.logger import logger
 from core.rag_indexer.document_loaders.ocr import get_ocr_instance
 
 
@@ -48,10 +47,3 @@ class OCRImageLoader(BaseLoader):
             return ''
 
         return '\n'.join(extracted_lines)
-
-
-if __name__ == '__main__':
-    setup_logging()
-    img_loader = OCRImageLoader(str(config.FILES_DIR / 'RAG系统流程图.png'))
-    doc = img_loader.load()
-    logger.info(doc)

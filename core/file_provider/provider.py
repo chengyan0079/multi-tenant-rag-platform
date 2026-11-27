@@ -79,7 +79,7 @@ class FileProvider(ABC):
 def build_file_provider() -> FileProvider:
     """按配置选择文件存储实现（路由层只依赖 FileProvider 抽象，无需改动）。
 
-    当前支持 MinIO 与 Mock 两种；新增对象存储（如 OSS）时，实现 FileProvider
+    当前支持 MinIO 与本地目录两种；新增对象存储（如 OSS）时，实现 FileProvider
     抽象并在此注册即可，接口与业务逻辑不受影响。默认走 MinIO。
     """
     from common.config import config

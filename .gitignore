@@ -139,9 +139,12 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
+
+.idea/
+
+
 # 项目忽略
 models/
-.idea/
 .codebuddy/
 memory/
 logs/

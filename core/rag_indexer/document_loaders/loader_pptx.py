@@ -11,8 +11,7 @@ from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx.shapes.autoshape import Shape
 from tqdm import tqdm
 
-from common.config import config
-from common.logger import logger, setup_logging
+from common.logger import logger
 from core.rag_indexer.document_loaders.ocr import get_ocr_instance
 
 
@@ -77,11 +76,3 @@ class OCRPPTLoader(BaseLoader):
 
         pro_bar.close()
         return '\n'.join(extracted_chunks)
-
-
-if __name__ == '__main__':
-    setup_logging()
-    ppt_loader = OCRPPTLoader(filepath=str(config.FILES_DIR / '英语面试指南.pptx'))
-    docs = ppt_loader.load()
-    logger.info(docs)
-    logger.info(len(docs[0].page_content))

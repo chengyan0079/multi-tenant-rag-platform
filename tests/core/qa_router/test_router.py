@@ -150,6 +150,60 @@ def test_answer_stream_rag_yields_meta_tokens_done():
     asyncio.run(_run())
 
 
+def test_answer_stream_stop_persists_partial_and_skips_cache():
+    """停止后落库已生成片段、不发缓存、发 stopped 事件，且底层流被关闭。"""
+    class _ClosingStreamGen:
+        def __init__(self):
+            self.closed = False
+
+        async def astream(self, **kw):
+            try:
+                for t in ["你", "好", "世", "界"]:
+                    yield t
+            finally:
+                self.closed = True
+
+    async def _run():
+        retr = mock.AsyncMock()
+        retr.retrieve.return_value = []
+        strat = mock.AsyncMock()
+        strat.select_strategy.return_value = RetrievalStrategy.DIRECT
+        aug = mock.AsyncMock()
+        aug.augment_and_retrieve.return_value = [
+            mock.MagicMock(chunk_id=1, content="c", doc_name="d", page=1, rerank_score=0.9, meta={})
+        ]
+        gen = _ClosingStreamGen()
+        router = m.QARouter(retriever=retr, generator=gen, strategy_selector=strat, augmenter=aug)
+        calls = 0
+
+        async def stop_after_two():
+            nonlocal calls
+            calls += 1
+            return calls >= 2
+
+        events = []
+        with mock.patch.object(m, "classify_query", return_value="专业咨询"), \
+             mock.patch.object(m, "get_answer", return_value=None), \
+             mock.patch.object(m, "set_answer") as set_ans, \
+             mock.patch.object(router, "_compress_context",
+                               new=mock.AsyncMock(side_effect=_passthrough_compress)), \
+             mock.patch.object(router, "_persist_session", new=mock.AsyncMock()) as ps, \
+             mock.patch.object(router, "_audit_llm_result", new=mock.AsyncMock()):
+            async for ev, data in router.answer_stream(
+                    "问题", tenant_id=1, stop_check=stop_after_two):
+                events.append((ev, data))
+
+        kinds = [e for e, _ in events]
+        assert "stopped" in kinds and kinds[-1] == "done"
+        assert "".join(d for e, d in events if e == "token") == "你好"
+        assert gen.closed is True                       # 底层流已释放
+        set_ans.assert_not_awaited()                    # 半截答案不缓存
+        ps.assert_awaited_once()
+        assert "你好" in ps.await_args.args[1]           # 落库的是实际生成的部分
+
+    asyncio.run(_run())
+
+
 def test_cache_and_faq_branches_also_persist():
     """审计完整性：缓存/FAQ 命中同样落明细，source 要能区分。"""
     async def _run():

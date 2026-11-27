@@ -1,10 +1,4 @@
-"""
-test_compression - 检索片段压缩单测（pytest + mock）
-
-覆盖设计方案 docs/上下文压缩设计方案.md §5 的各档策略：
-none / truncate（L0 按大小截取 + 按句截短）/ select（L1 相关性精选）/ llm_summary（L2 摘要与失败回退）。
-用 asyncio.run 包裹异步逻辑，避免依赖 pytest-asyncio 插件。
-"""
+"""检索片段压缩单测：truncate / select / llm_summary 各档与失败回退。"""
 import asyncio
 import os
 import sys
@@ -134,7 +128,7 @@ def test_no_change_reported_as_none():
 
 
 def test_result_to_dict_exposes_metrics():
-    """响应与日志要能拿到压缩方式与丢弃数（设计方案 §7 可观测性）。"""
+    """响应与日志要能拿到压缩方式与丢弃数。"""
     res = compression.CompressResult(chunks=[], method='truncate',
                                      chars_before=100, chars_after=50, kept_indices=[0], dropped=2)
     assert res.to_dict() == {'method': 'truncate', 'chars_before': 100, 'chars_after': 50,

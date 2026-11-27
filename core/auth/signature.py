@@ -51,7 +51,7 @@ def sign(secret: str, method: str, path: str, timestamp: str | int, nonce: str,
 def build_auth_headers(method: str, path: str, secret: str, tenant: str = '',
                        user: str = '', timestamp: int | None = None,
                        nonce: str | None = None) -> dict[str, str]:
-    """生成调用方需要的三个头（含身份头），供自测脚本与联调方直接使用。"""
+    """生成调用方需要的三个头（含身份头），供网关对接方构造请求使用。"""
     ts = now_ts() if timestamp is None else timestamp
     nc = new_nonce() if nonce is None else nonce
     return {

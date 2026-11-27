@@ -16,12 +16,12 @@ import core.config_center.prompts_manager as pm
 
 def test_strategy_select_prompt_nacos_missing_returns_fallback():
     with mock.patch.object(pm, "get_prompt", return_value=None):
-        out = pm.RAGPromptsManager.strategy_select_prompt()
+        out = pm.PromptManager.strategy_select_prompt()
     assert "检索策略选择器" in out
     assert "直接检索" in out
 
 
 def test_strategy_select_prompt_uses_nacos():
     with mock.patch.object(pm, "get_prompt", return_value="自定义策略提示词"):
-        out = pm.RAGPromptsManager.strategy_select_prompt()
+        out = pm.PromptManager.strategy_select_prompt()
     assert out == "自定义策略提示词"

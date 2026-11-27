@@ -74,10 +74,3 @@ class FastMarkdownLoader(BaseLoader):
         except Exception as e:
             logger.error(f'Markdown 强制读取失败 [{self.file_path}]: {e}', exc_info=True)
             return None
-
-
-if __name__ == '__main__':
-    md_loader = FastMarkdownLoader(str(config.FILES_DIR / 'Python学习资源汇总.md'))
-    docs = md_loader.load()
-    print(type(docs), len(docs))
-    print(docs[0].page_content)

@@ -1,4 +1,4 @@
-"""IndexManager（stage 3）：Redis BRPOP 消费索引任务；启动扫描 status=0 残留重新入队保证最终完成；无 Redis 时不启动（降级进程内 create_task）。"""
+"""IndexManager（stage 3）：Redis BRPOP 消费索引任务；启动扫描 status∈{0,1} 残留重新入队保证最终完成；无 Redis 时不启动（降级进程内 create_task）。"""
 import asyncio
 import json
 
@@ -11,7 +11,7 @@ from core.rag_indexer.pipeline import run_index_job
 from store.postgres_store import get_sessionmaker
 from store.orm_models.file import File
 from store.orm_models.knowledge import Doc
-from store.redis_keys import index_queue_key
+from store.redis_keys import KeyTTL, index_queue_key, index_recover_key
 
 
 class IndexManager(Manager):
@@ -39,22 +39,33 @@ class IndexManager(Manager):
                 pass
 
     async def _requeue_pending(self) -> None:
-        """崩溃恢复：status=0 的文档重新入队。"""
+        """崩溃恢复：把未完成（待解析/解析中）的文档重新入队。
+
+        status=1 也要扫：任务已被 BRPOP 弹出，worker 硬崩溃时异常分支不执行，
+        文档会永久停在"解析中"。多 worker 各自扫描时用 SETNX 认领，避免重复重投。
+        """
         try:
             factory = get_sessionmaker()
             async with factory() as session:
                 rows = (await session.execute(
                     select(Doc.id, Doc.tenant_id, Doc.file_upload_id, Doc.doc_type)
-                    .where(Doc.status == 0)
+                    .where(Doc.status.in_((0, 1)))
                 )).all()
+            requeued = 0
             for doc_id, tenant_id, file_id, doc_type in rows:
-                oss_key, _ = await self._oss_key_of(tenant_id, file_id)
+                # 认领锁 TTL 到期后允许再次重投，避免持锁 worker 崩溃导致永久遗漏
+                claimed = await app_state.redis.set(
+                    index_recover_key(doc_id), '1', nx=True, ex=KeyTTL.INDEX_RECOVER)
+                if not claimed:
+                    continue
+                oss_key, file_name = await self._oss_key_of(tenant_id, file_id)
                 if oss_key:
                     await app_state.redis.lpush(index_queue_key(), json.dumps(
                         {'tenant_id': tenant_id, 'doc_id': doc_id, 'oss_key': oss_key,
-                         'file_name': '', 'doc_type': doc_type}, ensure_ascii=False))
-            if rows:
-                logger.info(f'索引恢复：重新入队 {len(rows)} 个未完成文档')
+                         'file_name': file_name or '', 'doc_type': doc_type}, ensure_ascii=False))
+                    requeued += 1
+            if requeued:
+                logger.info(f'索引恢复：重新入队 {requeued} 个未完成文档')
         except Exception:  # noqa: BLE001
             logger.exception('索引残留任务扫描失败（忽略，后续可手动触发）')
 

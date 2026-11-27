@@ -60,3 +60,22 @@ def test_middleware_sets_trace_in_logs_and_header() -> None:
         assert any(f"trace={gen}" in ln for ln in lines)
     finally:
         logger.remove(sink_id)
+
+
+def test_middleware_resets_trace_on_exception() -> None:
+    """路由抛异常时 contextvar 也要复位，避免污染后续请求。"""
+    app = FastAPI()
+    app.add_middleware(TraceMiddleware)
+
+    @app.get("/boom")
+    def boom():
+        raise RuntimeError("boom")
+
+    sentinel = "prior"
+    token = trace_id_ctx.set(sentinel)
+    try:
+        with TestClient(app, raise_server_exceptions=False) as client:
+            assert client.get("/boom").status_code == 500
+        assert trace_id_ctx.get() == sentinel   # 异常路径下已复位
+    finally:
+        trace_id_ctx.reset(token)

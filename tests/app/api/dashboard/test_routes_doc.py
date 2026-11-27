@@ -12,7 +12,7 @@ class _DocDao:
     async def create(tenant_id, file_id, doc_type=0):
         return 11
     @staticmethod
-    async def get_status(doc_id):
+    async def get_status(tenant_id, doc_id):
         return {'status': 2, 'chunk_count': 3, 'err_msg': None}
     @staticmethod
     async def update_status(*a, **k):
@@ -69,7 +69,7 @@ def test_create_doc_missing_file(env, monkeypatch):
 def test_status_not_found(env, monkeypatch):
     class _D:
         @staticmethod
-        async def get_status(doc_id):
+        async def get_status(tenant_id, doc_id):
             raise KeyError('x')
     monkeypatch.setattr(routes_doc, 'DocDao', _D)
     client, _ = env

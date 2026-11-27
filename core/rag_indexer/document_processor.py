@@ -2,7 +2,6 @@
 import hashlib
 import os
 from datetime import datetime
-from pathlib import Path
 
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter

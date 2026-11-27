@@ -31,10 +31,12 @@ class DocDao:
             await session.commit()
             return doc.id
 
-    async def get_status(self, doc_id: int) -> dict:
+    async def get_status(self, tenant_id: int, doc_id: int) -> dict:
         """返回 {status, chunk_count, err_msg, version, doc_type}；不存在抛 KeyError。"""
         async with self._factory() as session:
-            doc = (await session.execute(select(Doc).where(Doc.id == doc_id))).scalar_one_or_none()
+            doc = (await session.execute(
+                select(Doc).where(Doc.id == doc_id, Doc.tenant_id == tenant_id)
+            )).scalar_one_or_none()
             if doc is None:
                 raise KeyError(f'doc not found: {doc_id}')
             return {
@@ -66,11 +68,13 @@ class DocDao:
             })
         return out
 
-    async def update_status(self, doc_id: int, status: int,
+    async def update_status(self, tenant_id: int, doc_id: int, status: int,
                             chunk_count: int = 0, err_msg: str | None = None) -> None:
         """回写解析状态：0=待解析 1=解析中 2=完成 3=失败。"""
         async with self._factory() as session:
-            doc = (await session.execute(select(Doc).where(Doc.id == doc_id))).scalar_one_or_none()
+            doc = (await session.execute(
+                select(Doc).where(Doc.id == doc_id, Doc.tenant_id == tenant_id)
+            )).scalar_one_or_none()
             if doc is None:
                 return
             doc.status = status
@@ -80,26 +84,30 @@ class DocDao:
                 doc.err_msg = err_msg[:512]
             await session.commit()
 
-    async def next_version(self, tenant_id: int, doc_id: int) -> int:
-        """返回该 doc 的下一个版本号（当前最大版本 +1；无切片则为 1）。"""
-        async with self._factory() as session:
-            row = (await session.execute(
-                select(Chunk.version).where(
-                    Chunk.tenant_id == tenant_id, Chunk.doc_id == doc_id
-                ).order_by(Chunk.version.desc()).limit(1)
-            )).scalar_one_or_none()
-            return (row or 0) + 1
-
     async def save_chunks(self, tenant_id: int, doc_id: int, scope: int,
-                         chunks: list[dict], version: int | None = None) -> int:
+                          chunks: list[dict]) -> tuple[int, int]:
         """写切片并维护版本：旧版本 soft-delete（enabled=0，保留可回滚），新版本插入 enabled=1。
 
         chunks 元素需含 text / parent_id / parent_content / doc_name / page（来自 pipeline）。
-        版本号默认自增；显式传入时（如 pipeline 已预取）直接使用，保证 PG 与 Milvus 主键值一致。
+        返回 (实际写入版本, 切片数)；版本在锁内分配，调用方需用返回版本算 Milvus 主键。
         """
-        if version is None:
-            version = await self.next_version(tenant_id, doc_id)
         async with self._factory() as session:
+            # 锁住文档行，让同一 doc 的并发索引串行分配版本，避免 max+1 读后写拿到重复版本号
+            doc = (await session.execute(
+                select(Doc.id).where(
+                    Doc.id == doc_id, Doc.tenant_id == tenant_id
+                ).with_for_update()
+            )).scalar_one_or_none()
+            if doc is None:
+                raise KeyError(f'doc not found: {doc_id}')
+            # max 取历史最高版本，回滚后重新索引也不会复用旧版本号
+            row = (await session.execute(
+                select(func.max(Chunk.version)).where(
+                    Chunk.tenant_id == tenant_id, Chunk.doc_id == doc_id
+                )
+            )).scalar_one_or_none()
+            version = (row or 0) + 1
+
             # 旧版本软删：仅停用，不物理删除，供版本回滚时重新启用
             await session.execute(
                 update(Chunk).where(
@@ -122,10 +130,10 @@ class DocDao:
             ]
             session.add_all(rows)
             await session.execute(
-                update(Doc).where(Doc.id == doc_id).values(version=version)
+                update(Doc).where(Doc.id == doc_id, Doc.tenant_id == tenant_id).values(version=version)
             )
             await session.commit()
-            return len(rows)
+            return version, len(rows)
 
     async def list_versions(self, tenant_id: int, doc_id: int) -> list[dict]:
         """列出该 doc 各版本（version / chunk_count / enabled），用于回滚 UI 展示。"""
@@ -163,7 +171,7 @@ class DocDao:
                 ).values(enabled=1)
             )
             await session.execute(
-                update(Doc).where(Doc.id == doc_id).values(version=target_version)
+                update(Doc).where(Doc.id == doc_id, Doc.tenant_id == tenant_id).values(version=target_version)
             )
             await session.commit()
             return result.rowcount or 0

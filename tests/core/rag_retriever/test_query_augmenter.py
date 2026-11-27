@@ -1,7 +1,7 @@
 """
 test_query_augmenter - 检索增强/改写单测（pytest + mock）
 
-mock 掉 Retriever、RAGPromptsManager 的改写提示词与 acomplete（LLM 调用）。
+mock 掉 Retriever、PromptManager 的改写提示词与 acomplete（LLM 调用）。
 用 asyncio.run 包裹异步逻辑，避免依赖 pytest-asyncio 插件。
 """
 import asyncio
@@ -43,7 +43,7 @@ def test_hyde_uses_hypothetical_doc():
     async def _run():
         retr = mock.AsyncMock()
         retr.retrieve.return_value = [_chunk(2, "b")]
-        with mock.patch.object(m.RAGPromptsManager, "hyde_gen_prompt", return_value=_fake_template()), \
+        with mock.patch.object(m.PromptManager, "hyde_gen_prompt", return_value=_fake_template()), \
              mock.patch.object(m, "acomplete", return_value="假设文档内容"):
             aug = m.QueryAugmenter(retriever=retr)
             res = await aug.augment_and_retrieve("q", RetrievalStrategy.HYDE, tenant_id=1)
@@ -59,7 +59,7 @@ def test_subquery_merges_and_dedup():
             [_chunk(1, "a")],
             [_chunk(1, "a"), _chunk(2, "b")],
         ]
-        with mock.patch.object(m.RAGPromptsManager, "subq_gen_prompt", return_value=_fake_template()), \
+        with mock.patch.object(m.PromptManager, "subq_gen_prompt", return_value=_fake_template()), \
              mock.patch.object(m, "acomplete", return_value="子问题1\n子问题2"):
             aug = m.QueryAugmenter(retriever=retr)
             res = await aug.augment_and_retrieve("q", RetrievalStrategy.SUB_QUERY, tenant_id=1)
@@ -72,7 +72,7 @@ def test_augmentation_empty_falls_back_direct():
     async def _run():
         retr = mock.AsyncMock()
         retr.retrieve.side_effect = [[], [_chunk(9, "z")]]
-        with mock.patch.object(m.RAGPromptsManager, "hyde_gen_prompt", return_value=_fake_template()), \
+        with mock.patch.object(m.PromptManager, "hyde_gen_prompt", return_value=_fake_template()), \
              mock.patch.object(m, "acomplete", return_value="假设文档"):
             aug = m.QueryAugmenter(retriever=retr)
             res = await aug.augment_and_retrieve("q", RetrievalStrategy.HYDE, tenant_id=1)

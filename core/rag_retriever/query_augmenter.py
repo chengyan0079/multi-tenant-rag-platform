@@ -3,7 +3,7 @@ from typing import Any, Literal
 
 from common.config import config
 from common.logger import logger
-from core.config_center.prompts_manager import RAGPromptsManager
+from core.config_center.prompts_manager import PromptManager
 from core.rag_model.llm_client import acomplete
 from core.rag_retriever.retriever import RetrievedChunk, Retriever
 from core.rag_retriever.strategy_selector import RetrievalStrategy
@@ -45,7 +45,7 @@ class QueryAugmenter:
 
     async def retrieve_hyde(self, query: str, **kwargs) -> list[RetrievedChunk]:
         try:
-            hyp_doc = await _run_prompt(RAGPromptsManager.hyde_gen_prompt(), query)
+            hyp_doc = await _run_prompt(PromptManager.hyde_gen_prompt(), query)
         except Exception as e:  # noqa: BLE001
             logger.warning(f'HyDE 生成失败，回退直接检索: {e}')
             return await self.retrieve_direct(query, **kwargs)
@@ -55,7 +55,7 @@ class QueryAugmenter:
 
     async def retrieve_subqueries(self, query: str, **kwargs) -> list[list[RetrievedChunk]]:
         try:
-            raw = await _run_prompt(RAGPromptsManager.subq_gen_prompt(), query)
+            raw = await _run_prompt(PromptManager.subq_gen_prompt(), query)
         except Exception as e:  # noqa: BLE001
             logger.warning(f'子查询生成失败，回退直接检索: {e}')
             return [await self.retrieve_direct(query, **kwargs)]
@@ -66,7 +66,7 @@ class QueryAugmenter:
 
     async def retrieve_backtrack(self, query: str, **kwargs) -> list[RetrievedChunk]:
         try:
-            core_q = await _run_prompt(RAGPromptsManager.back_gen_prompt(), query)
+            core_q = await _run_prompt(PromptManager.back_gen_prompt(), query)
         except Exception as e:  # noqa: BLE001
             logger.warning(f'回溯问题生成失败，回退直接检索: {e}')
             return await self.retrieve_direct(query, **kwargs)

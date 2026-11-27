@@ -26,7 +26,7 @@ async def create_doc(req: DocRequest, tenant_id: int = Depends(resolve_tenant)):
     doc_id = await DocDao().create(tenant_id, req.file_id, req.doc_type)
     oss_key, file_name = await FileDao().get_oss_key(tenant_id, req.file_id)
     if not oss_key:
-        await DocDao().update_status(doc_id, 3, err_msg="关联文件不存在")
+        await DocDao().update_status(tenant_id, doc_id, 3, err_msg="关联文件不存在")
         return success(DocCreateResult(tenant_id=tenant_id, doc_id=doc_id, status="failed"))
     await enqueue_index(tenant_id, doc_id, oss_key, file_name or "", req.doc_type)
     return success(DocCreateResult(tenant_id=tenant_id, doc_id=doc_id, status="pending"))
@@ -36,7 +36,7 @@ async def create_doc(req: DocRequest, tenant_id: int = Depends(resolve_tenant)):
 async def doc_status(doc_id: int, tenant_id: int = Depends(resolve_tenant)):
     """查索引状态（pending/indexing/done/failed）。"""
     try:
-        st = await DocDao().get_status(doc_id)
+        st = await DocDao().get_status(tenant_id, doc_id)
     except KeyError:
         return fail(ErrCode.NOT_FOUND, "doc not found")
     return success(DocStatusData(doc_id=doc_id, status=_status_name(st["status"])))

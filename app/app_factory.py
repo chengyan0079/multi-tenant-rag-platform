@@ -35,7 +35,7 @@ def build_server() -> AppServer:
     server.register(MilvusManager(), order=55, stage=2)             # 依赖 Model（stage 在其后）
     server.register(FileProviderManager(), order=60, stage=1)       # 基础组件
     server.register(FaqCacheManager(), order=65, stage=2)           # 依赖 Redis+PostgreSQL
-    server.register(Neo4jManager(), order=70, stage=2)              # 图路侧车，GRAPH_ENABLED 时连接
+    server.register(Neo4jManager(), order=70, stage=2)              # 图路扩展，GRAPH_ENABLED 时连接
     server.register(NacosConfigManager(), order=105, stage=2)       # 依赖 Redis
     server.register(NacosDiscoverManager(), order=110, stage=3)     # 服务注册
     server.register(IndexManager(), order=115, stage=3)             # 后台消费（仅起协程，不阻塞）

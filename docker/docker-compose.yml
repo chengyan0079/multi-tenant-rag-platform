@@ -1,4 +1,4 @@
-name: rag-pro
+name: rag-ultra
 
 services:
   etcd:
@@ -76,6 +76,21 @@ services:
       - "5432:5432"
     volumes:
       - ./volumes/postgres:/var/lib/postgresql/data
+
+  neo4j:
+    image: neo4j:5.26-community
+    container_name: neo4j-server
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/neo4j123
+      NEO4J_PLUGINS: '[]'
+      TZ: Asia/Shanghai
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - ./volumes/neo4j/data:/data
+      - ./volumes/neo4j/logs:/logs
 
   attu:
     image: zilliz/attu:v2.4.12

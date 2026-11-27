@@ -57,7 +57,7 @@ class GraphNode:
     """
 
     label: NodeLabel
-    key: str                       # 业务唯一键（如 CHG-21 / INC-MVP-001）
+    key: str                       # 业务唯一键（如变更单号 / 故障单号）
     props: dict[str, Any] = field(default_factory=dict)
     tenant_id: int | None = None
     source: NodeSource = NodeSource.STRUCTURED

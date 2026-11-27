@@ -9,7 +9,6 @@ from common.logger import logger
 
 
 def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
-    """基于 app_state.db_engine 创建会话工厂。"""
     if app_state.db_engine is None:
         raise RuntimeError('数据库引擎未初始化，请确认 PostgresManager 已启动')
     return async_sessionmaker(app_state.db_engine, class_=AsyncSession, expire_on_commit=False)
@@ -29,7 +28,6 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def ping() -> bool:
-    """健康检查：执行 SELECT 1。"""
     try:
         async with get_sessionmaker()() as session:
             await session.execute(text('SELECT 1'))

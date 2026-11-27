@@ -38,7 +38,7 @@ def test_rrf_weights_affect_order():
 
 def test_rerank_no_model_falls_back():
     cands = [_chunk('a', '1'), _chunk('b', '2'), _chunk('c', '3')]
-    out = fu.rerank_and_refill('q', cands, None, top_k=2)
+    out = _run(fu.rerank_and_refill('q', cands, None, top_k=2))
     assert [c.content for c in out] == ['1', '2']
 
 
@@ -49,7 +49,7 @@ def test_rerank_uses_model_and_refills_chain():
     model = mock.MagicMock()
     model.reranker = object()
     model.rerank = mock.MagicMock(return_value=[mock.MagicMock(index=0, score=0.9)])
-    out = fu.rerank_and_refill('q', [a, b, c], model, top_k=1)
+    out = _run(fu.rerank_and_refill('q', [a, b, c], model, top_k=1))
     # rerank 选 a，链补齐把同链 b 也带回
     assert a in out and b in out
 

@@ -52,7 +52,7 @@ def match_faq(items: list[dict], query: str) -> Optional[int]:
 
 
 # ----------------------------- BM25 相似匹配（按租户） -----------------------------
-# 精确匹配未命中时，用 BM25 对"标准问题 + 相似问"做模糊匹配，得分 ≥ 阈值才采纳（对齐 rag-pro）。
+# 精确匹配未命中时，用 BM25 对"标准问题 + 相似问"做模糊匹配，得分 ≥ 阈值才采纳。
 # jieba / rank_bm25 为可选依赖（见 requirements.txt）：缺失则 _tokenize 退化为字符粗切、
 # _build_bm25 返回空，整体退化为仅精确匹配，不影响主链路。
 _STOPWORDS = frozenset({
@@ -190,7 +190,7 @@ async def get_faq_answer(tenant_id: int, query: str) -> Tuple[Optional[str], Opt
 
     faq_id = match_faq(items, query)
     if faq_id is None and config.FAQ_BM25_ENABLED:
-        # 精确未命中 → BM25 相似 + 阈值兜底（对齐 rag-pro；按租户缓存，FAQ 变更自动失效）
+        # 精确未命中 → BM25 相似 + 阈值兜底（按租户缓存，FAQ 变更自动失效）
         faq_id = bm25_match(items, query, config.FAQ_BM25_THRESHOLD, tenant_id)
     if faq_id is None:
         return None, None

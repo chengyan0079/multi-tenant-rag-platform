@@ -16,6 +16,7 @@ class KeyPrefix:
     USER = "u"                  # 用户隔离段前缀（会话按 租户+用户 归属）             # 多轮会话存储
     CHAT_STOP = ("rag", "chatstop")  # 聊天停止标记（取消进行中的流式生成）：rag:chatstop:<user>:<session>
     AUTH_NONCE = ("rag", "authnonce")  # 调用方签名 nonce 去重（防重放）：rag:authnonce:<nonce>
+    INDEX_RECOVER = ("rag", "idx_recover")  # 索引恢复认领锁（多 worker 避免重复重投）
 
 
 class KeyTTL:
@@ -28,10 +29,11 @@ class KeyTTL:
     SESSION = config.REDIS_TTL_SESSION
     CHAT_STOP = config.REDIS_TTL_CHAT_STOP
     AUTH_NONCE = config.REDIS_TTL_AUTH_NONCE
+    INDEX_RECOVER = config.REDIS_TTL_INDEX_RECOVER
 
 
 def build_key(*parts: str) -> str:
-    """用 ':' 连接各段拼装 key。"""
+    """统一用 ':' 拼接，所有 key 的段序由此函数约定，避免各处手写漂移。"""
     return ":".join(parts)
 
 
@@ -60,5 +62,10 @@ INDEX_QUEUE = ("rag", "index_queue")
 
 
 def index_queue_key() -> str:
-    """文档索引任务队列 key：rag:index_queue（IndexManager 消费，崩溃恢复扫描 status=0）。"""
+    """文档索引任务队列 key：rag:index_queue（IndexManager 消费，崩溃恢复扫描 status∈{0,1}）。"""
     return build_key(*INDEX_QUEUE)
+
+
+def index_recover_key(doc_id: int) -> str:
+    """索引恢复认领锁：rag:idx_recover:<doc_id>，避免多 worker 重复重投同一任务。"""
+    return build_key(*KeyPrefix.INDEX_RECOVER, str(doc_id))

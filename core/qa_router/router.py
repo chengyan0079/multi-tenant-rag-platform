@@ -2,8 +2,8 @@
 
 FAQ 命中不调大模型；专业咨询走 RAG，通用知识空上下文直答；检索条数由
 config.RECALL_K / RERANK_TOP_K 统一控制。质量评估交离线 RAGAS（offline/rag_eval.py）。
-图路为侧车：GRAPH_ENABLED=true 且关键词命中时才融合图证据（source=graph_fused），
-图路空/超时一律退化为纯向量，与现状等价。
+GRAPH_ENABLED=true 且关键词命中时才融合图证据（source=graph_fused），
+图路空/超时一律退化为纯向量。
 """
 import asyncio
 import random
@@ -18,7 +18,7 @@ from core.session.session_service import SessionService
 from core.rag_retriever.retriever import RetrievedChunk, Retriever
 from core.rag_retriever.strategy_selector import RetrievalStrategy, StrategySelector
 from core.rag_retriever.query_augmenter import QueryAugmenter
-from core.rag_generator.generator import Generator
+from core.rag_generator.generator import GENERATION_FALLBACK, Generator
 from core.intent import classify_query
 from store.faq_cache import get_faq_answer
 from store.redis_store import get_answer, set_answer
@@ -47,7 +47,7 @@ class QARouter:
         self, query: str, tenant_id: int, intent: str,
         rag_hits: list[RetrievedChunk],
     ) -> tuple[list[RetrievedChunk], bool]:
-        """图路侧车：命中则融合图证据与向量候选，返回 (chunks, 是否图路生效)。
+        """图路融合：命中则融合图证据与向量候选，返回 (chunks, 是否图路生效)。
 
         惰性导入避免 GRAPH_ENABLED=false 时拉起 neo4j 依赖；任何异常都退回原向量结果。
         """
@@ -122,7 +122,7 @@ class QARouter:
             strategy = await self.strategy_selector.select_strategy(query)
             rag_hits = await self.augmenter.augment_and_retrieve(
                 query, strategy, tenant_id=tenant_id, filters=filters)
-            # 3.5) 图路侧车：关键词命中且图库可用时融合图证据；空/超时自动退化为纯向量
+            # 3.5) 图路融合：关键词命中且图库可用时融合图证据；空/超时自动退化为纯向量
             rag_hits, graph_used = await self._try_graph(query, tenant_id, intent, rag_hits)
             if not rag_hits:
                 await self._persist_session(query, '抱歉，未找到答案！', session_id, intent, user_id,
@@ -137,7 +137,7 @@ class QARouter:
 
         # 5) 大模型生成
         answer = await self.generator.generate(query=query, chunks=rag_hits, session_id=session_id, user_id=user_id)
-        # 6) 审计（后续接入 RAGAS 评测管道）+ 问答明细落库
+        # 6) 问答明细落库
         await self._audit_llm_result(query, answer, rag_hits, None, user_id)
         source = 'graph_fused' if graph_used else 'rag'
         await self._persist_session(query, answer, session_id, intent, user_id, meta={
@@ -148,7 +148,9 @@ class QARouter:
             'compress_dropped': compress_result.dropped,
             'latency_ms': int((time.time() - started) * 1000),
         })
-        await set_answer(tenant_id, query, answer)
+        # 生成失败的兜底文案不缓存，否则故障期间的错误答案会被复用一小时
+        if answer != GENERATION_FALLBACK:
+            await set_answer(tenant_id, query, answer)
         return {
             'answer': answer,
             'source': source,
@@ -167,6 +169,7 @@ class QARouter:
         session_id: str | None = None,
         user_id: str | None = None,
         filters: dict[str, Any] | None = None,
+        stop_check: Any | None = None,
     ):
         """流式问答：与 answer 同链路，但逐段 yield (event, data) 供 SSE 输出。
 
@@ -174,7 +177,11 @@ class QARouter:
         - ("meta", {source, intent, session_id[, chunks]})：阶段元信息（rag 时带召回片段）
         - ("answer", 文本)：缓存/FAQ/空 的整段答案
         - ("token", 文本)：RAG 逐 token 输出
+        - ("stopped", {msg})：生成中途被停止
         - ("done", {})：结束
+
+        stop_check 为异步 callable：每个 token 产出后询问是否停止。停止时释放底层
+        生成器、落库已生成的片段，不再写缓存——避免半截答案被后续命中复用。
         """
         if not query or not query.strip():
             yield ("meta", {"source": "empty", "intent": "通用知识", "session_id": session_id})
@@ -224,7 +231,7 @@ class QARouter:
             strategy = await self.strategy_selector.select_strategy(query)
             rag_hits = await self.augmenter.augment_and_retrieve(
                 query, strategy, tenant_id=tenant_id, filters=filters)
-            # 3.5) 图路侧车：关键词命中且图库可用时融合图证据；空/超时自动退化为纯向量
+            # 3.5) 图路融合：关键词命中且图库可用时融合图证据；空/超时自动退化为纯向量
             rag_hits, graph_used = await self._try_graph(query, tenant_id, intent, rag_hits)
             if not rag_hits:
                 # 专业咨询检索无命中：不生成，直接回复"未找到"
@@ -252,11 +259,20 @@ class QARouter:
 
         # 5) 流式生成：逐 token 产出，并累计完整答案用于缓存
         full_parts: list[str] = []
-        async for piece in self.generator.astream(
+        stopped = False
+        stream = self.generator.astream(
             query=query, chunks=rag_hits, session_id=session_id, user_id=user_id,
-        ):
-            full_parts.append(piece)
-            yield ("token", piece)
+        )
+        try:
+            async for piece in stream:
+                full_parts.append(piece)
+                yield ("token", piece)
+                if stop_check is not None and await stop_check():
+                    stopped = True
+                    break
+        finally:
+            # 停止或客户端断开时释放底层 LLM 流，避免连接与 token 继续消耗
+            await stream.aclose()
 
         # 6) 审计 + 问答明细落库 + 答案缓存
         full_answer = "".join(full_parts)
@@ -269,12 +285,13 @@ class QARouter:
             'compress_dropped': compress_result.dropped,
             'latency_ms': int((time.time() - started) * 1000),
         })
-        await set_answer(tenant_id, query, full_answer)
+        # 半截答案不入缓存，否则后续同问会命中不完整内容
+        if not stopped and full_answer != GENERATION_FALLBACK:
+            await set_answer(tenant_id, query, full_answer)
+        if stopped:
+            yield ("stopped", {"msg": "已停止"})
         yield ("done", {})
 
-    # ------------------------------------------------------------------
-    # 以下为预留占位能力：尚未实现，仅打通调用点，后续按需填充落地逻辑。
-    # ------------------------------------------------------------------
 
     async def _compress_context(
         self, query: str, chunks: list[RetrievedChunk], session_id: str | None

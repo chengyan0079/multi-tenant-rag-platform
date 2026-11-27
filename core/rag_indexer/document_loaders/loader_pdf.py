@@ -9,8 +9,7 @@ from langchain_core.document_loaders import BaseLoader
 from langchain_core.documents import Document
 from tqdm import tqdm
 
-from common.config import config
-from common.logger import setup_logging, logger
+from common.logger import logger
 from core.rag_indexer.document_loaders.ocr import get_ocr_instance
 
 IMAGE_AREA_RATIO_THRESHOLD = 0.1
@@ -95,11 +94,3 @@ class OCRPDFLoader(BaseLoader):
             pdf_doc.close()
 
         return '\n\n'.join(text_buffer)
-
-
-if __name__ == '__main__':
-    setup_logging()
-    pdf_loader = OCRPDFLoader(file_path=str(config.FILES_DIR / 'LLM基础知识.pdf'))
-    docs = pdf_loader.load()
-    logger.info(type(docs), len(docs))
-    logger.info(docs[0].page_content)

@@ -63,7 +63,7 @@ class Config(BaseSettings):
     DENSE_WEIGHT:    float = Field(default=0.7, ge=0.0, le=1.0)     # 加权融合稠密权重
     SPARSE_WEIGHT:   float = Field(default=0.3, ge=0.0, le=1.0)     # 加权融合稀疏权重
 
-    # FAQ 模糊匹配（BM25）：精确匹配未命中时按相似度 + 阈值兜底（机制对齐 rag-pro）
+    # FAQ 模糊匹配（BM25）：精确匹配未命中时按相似度 + 阈值兜底
     FAQ_BM25_ENABLED:   bool  = True                               # 是否启用 BM25 相似匹配
     # BM25 原始分阈值（raw score，非归一化，随语料规模增大而升高）。默认 2.0 按"单租户数十条 FAQ"
     # 校准（好的匹配约 2~4，不相关≈0）；FAQ 规模更大宜调高，更稀疏调低。
@@ -81,10 +81,11 @@ class Config(BaseSettings):
 
     # 调用方签名校验（HMAC-SHA256）：防"绕过网关直连、伪造 X-Tenant-Id/X-User-Id"
     # 开启后调用方必须带 X-Auth-Timestamp / X-Auth-Nonce / X-Auth-Signature（见 core.auth）
-    AUTH_HMAC_ENABLED:    bool = True    # 默认关闭：本地自测与既有调用不受影响；接入网关后再开
+    AUTH_HMAC_ENABLED:    bool = True    # 调用方须携带 HMAC 签名头；网关未接入时由 IDENTITY_DEFAULT_* 兜底身份
     AUTH_HMAC_SECRET:     str = ''        # 当前密钥（开启时必填，否则无法验签）
     AUTH_HMAC_SECRET_PREV: str = ''       # 轮换期旧密钥：与当前密钥任一匹配即通过，可留空
     AUTH_HMAC_TTL:        int = 60        # 时间戳允许偏差（秒），同时决定 nonce 去重窗口
+    AUTH_HMAC_FAIL_CLOSED: bool = False   # 密钥缺失或 Redis 不可用时拒绝请求；安全敏感部署应开启
     # 不验签的路径前缀（文档 / 自描述 / 探活）
     AUTH_HMAC_EXCLUDE: Annotated[list[str], NoDecode] = [
         '/docs', '/redoc', '/openapi.json', '/admin/health']
@@ -102,7 +103,7 @@ class Config(BaseSettings):
     MILVUS_DB_NAME:  str = 'rag_ultra'
     MILVUS_COLLECTION: str = 'rag_chunks'
 
-    # 故障图谱（GraphRAG 侧车）：离线建图 + 在线图检索，默认关闭，独立接口跑通后再接主链路
+    # 故障图谱：离线建图 + 在线图检索，与主问答链路集成
     NEO4J_URI:           str = 'bolt://localhost:7687'
     NEO4J_USER:          str = 'neo4j'
     NEO4J_PASSWORD:      str = ''
@@ -144,8 +145,9 @@ class Config(BaseSettings):
     REDIS_TTL_FAQ:             int = 30 * 24 * 3600    # FAQ 缓存（启动全量载入 + 写穿透，长 TTL 作兜底）
     REDIS_TTL_CHAT_STOP:       int = 120                # 聊天停止标记（秒，短 TTL 自动过期；跨 worker 取消生成）
     REDIS_TTL_AUTH_NONCE:      int = 120                # 签名 nonce 去重（取 ≥ 2×AUTH_HMAC_TTL）
+    REDIS_TTL_INDEX_RECOVER:   int = 300                # 索引恢复认领锁（多 worker 启动时避免重复重投）
 
-    CACHE_KEY_PREFIX: str = 'ragpro:qa'
+    CACHE_KEY_PREFIX: str = 'ragultra:qa'
 
     LLM_MODEL_NAME:     str = 'deepseek-flash'
     LLM_MODEL_PROVIDER: str = 'openai'
@@ -153,15 +155,15 @@ class Config(BaseSettings):
     LLM_TEMPERATURE:    int = 0
     LLM_MAX_TOKENS:     int = 1000
     LLM_THINKING_TYPE:  str = 'disabled'
-    LLM_API_KEY:        str = Field(default='', validation_alias='OPENAI_API_KEY')
-    OPENAI_API_KEY:     str = Field(default='', validation_alias='LLM_API_KEY')
+    LLM_API_KEY:        str = ''        # 线上 LLM 网关密钥（.env 里写 LLM_API_KEY）
+    OPENAI_API_KEY:     str = ''        # 备用别名，仅供需要 OPENAI_API_KEY 环境变量的工具读取
 
     # RAGAS 离线评测（详见 offline/rag_eval.py）：单独环境跑，依赖不进运行时 requirements.txt。
     # LLM 默认复用线上网关（覆盖 .env 的 RAGAS_LLM_BASE_URL / RAGAS_LLM_MODEL 即可）；
     # embedding 走本地 bge-m3（ollama OpenAI 兼容）更省成本。
     RAGAS_LLM_BASE_URL:   str = 'http://localhost:8000/v1'
     RAGAS_LLM_MODEL:      str = 'deepseek-chat'
-    RAGAS_LLM_API_KEY:    str = Field(default='', validation_alias='LLM_API_KEY')
+    RAGAS_LLM_API_KEY:    str = Field(default='', validation_alias='LLM_API_KEY')  # 评测默认复用线上网关密钥
     RAGAS_EMBED_BASE_URL: str = 'http://localhost:11434/v1'
     RAGAS_EMBED_MODEL:    str = 'bge-m3:latest'
 
@@ -174,7 +176,7 @@ class Config(BaseSettings):
     FILE_TTL_HOURS:   int = Field(default=24, ge=1)
     BASE64_MAX_BYTES: int = Field(default=5 * 1024 * 1024, ge=0)
 
-    # 未接 Java 网关时的固定身份（本地 / 联调自测用）：请求没带身份头时兜底用这两个值。
+    # 未接 Java 网关时的固定身份：请求没带身份头时兜底用这两个值。
     # 网关接入后设 IDENTITY_DEFAULT_ENABLED=False，恢复"缺头即拒"，避免线上漏传头时静默落到默认租户。
     IDENTITY_DEFAULT_ENABLED: bool = True
     DEFAULT_TENANT_ID: int = 100

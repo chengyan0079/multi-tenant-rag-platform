@@ -13,7 +13,7 @@ BACK_GENERATION_TEMPLATE_ID = 'BACK_GENERATION_TEMPLATE'
 STRATEGY_SELECT_TEMPLATE_ID = 'STRATEGY_SELECT_TEMPLATE'
 
 
-class RAGPromptsManager:
+class PromptManager:
     """RAG 系统中提示词模板管理器：按 data_id 从缓存/Nacos 取内容并构建 PromptTemplate。"""
 
     @staticmethod
@@ -29,7 +29,7 @@ class RAGPromptsManager:
         """直接回答提示词模板（含 {context}{question}{tel} 占位符）。"""
         from langchain_core.prompts import PromptTemplate
         return PromptTemplate.from_template(
-            RAGPromptsManager._load(CORE_RAG_TEMPLATE_ID)
+            PromptManager._load(CORE_RAG_TEMPLATE_ID)
         ).partial(tel=tel)
 
     @staticmethod
@@ -37,7 +37,7 @@ class RAGPromptsManager:
         """假设性文档嵌入生成提示词模板（{query}）。"""
         from langchain_core.prompts import PromptTemplate
         return PromptTemplate.from_template(
-            RAGPromptsManager._load(HYDE_GENERATION_TEMPLATE_ID)
+            PromptManager._load(HYDE_GENERATION_TEMPLATE_ID)
         )
 
     @staticmethod
@@ -45,7 +45,7 @@ class RAGPromptsManager:
         """子查询拆分提示词模板（{query}）。"""
         from langchain_core.prompts import PromptTemplate
         return PromptTemplate.from_template(
-            RAGPromptsManager._load(SUBQ_GENERATION_TEMPLATE_ID)
+            PromptManager._load(SUBQ_GENERATION_TEMPLATE_ID)
         )
 
     @staticmethod
@@ -53,14 +53,14 @@ class RAGPromptsManager:
         """回溯问题生成提示词模板（{query}）。"""
         from langchain_core.prompts import PromptTemplate
         return PromptTemplate.from_template(
-            RAGPromptsManager._load(BACK_GENERATION_TEMPLATE_ID)
+            PromptManager._load(BACK_GENERATION_TEMPLATE_ID)
         )
 
     @staticmethod
     def strategy_select_prompt() -> str:
         """检索策略路由提示词（零样本分类指令）；Nacos 缺配置时返回内置兜底。"""
         try:
-            return RAGPromptsManager._load(STRATEGY_SELECT_TEMPLATE_ID)
+            return PromptManager._load(STRATEGY_SELECT_TEMPLATE_ID)
         except Exception:  # noqa: BLE001
             return (
                 "你是一个检索策略选择器。根据用户问题判断最适合的检索增强策略，只返回策略名本身（不要解释）。\n"

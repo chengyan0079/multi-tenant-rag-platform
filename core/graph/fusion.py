@@ -35,8 +35,8 @@ def rrf_fuse(ranked_lists: list[list[RetrievedChunk]],
     return sorted(store.values(), key=lambda c: -c.score)
 
 
-def rerank_and_refill(query: str, cands: list[RetrievedChunk], model: Any,
-                      top_k: int | None = None) -> list[RetrievedChunk]:
+async def rerank_and_refill(query: str, cands: list[RetrievedChunk], model: Any,
+                            top_k: int | None = None) -> list[RetrievedChunk]:
     """rerank 选点 → 按 chain_id 补齐兄弟证据 → 保证因果链完整。
 
     model 为 ModelService；rerank 失败或模型未加载时退回融合顺序，与现有行为一致。
@@ -47,7 +47,10 @@ def rerank_and_refill(query: str, cands: list[RetrievedChunk], model: Any,
     if model is None or getattr(model, 'reranker', None) is None:
         return cands[:top_k]
     try:
-        results = model.rerank(query=query, documents=[c.content for c in cands], top_k=top_k)
+        # rerank 是同步阻塞调用，丢线程池避免卡住事件循环
+        results = await asyncio.to_thread(
+            model.rerank, query=query, documents=[c.content for c in cands], top_k=top_k,
+        )
     except Exception as e:  # noqa: BLE001
         logger.warning(f'图向量融合 rerank 失败，退回 RRF 顺序: {e}')
         return cands[:top_k]
@@ -91,4 +94,4 @@ async def graph_fused_retrieve(
         return None
     graph_hits = graph_hits[:config.GRAPH_MAX_EVIDENCE]
     fused = rrf_fuse([graph_hits, vector_hits], weights=weights)
-    return rerank_and_refill(query, fused, model)
+    return await rerank_and_refill(query, fused, model)

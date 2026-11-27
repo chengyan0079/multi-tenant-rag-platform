@@ -3,7 +3,7 @@ from enum import Enum
 
 from common.config import config
 from common.logger import logger
-from core.config_center.prompts_manager import RAGPromptsManager
+from core.config_center.prompts_manager import PromptManager
 from core.rag_model.llm_client import acomplete
 
 
@@ -24,7 +24,7 @@ class StrategySelector:
     async def select_strategy(self, query: str) -> RetrievalStrategy:
         if not self.enabled:
             return RetrievalStrategy.DIRECT
-        prompt = RAGPromptsManager.strategy_select_prompt()
+        prompt = PromptManager.strategy_select_prompt()
         raw = await acomplete(f'{prompt}\n\n用户问题：{query}', temperature=0.0, max_tokens=16)
         text = (raw or '').strip().strip('。')
         for s in RetrievalStrategy:

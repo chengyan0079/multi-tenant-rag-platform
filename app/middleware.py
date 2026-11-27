@@ -27,9 +27,12 @@ class TraceMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable[..., Any]) -> Any:
         tid = request.headers.get("X-Trace-Id") or uuid.uuid4().hex
         token = trace_id_ctx.set(tid)
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        finally:
+            # call_next 抛异常时也要复位，否则 contextvar 泄漏到后续请求
+            trace_id_ctx.reset(token)
         response.headers["X-Trace-Id"] = tid
-        trace_id_ctx.reset(token)
         return response
 
 
@@ -93,11 +96,13 @@ class AuthSignatureMiddleware:
     """调用方签名校验（纯 ASGI）：未通过直接 401，不进路由。
 
     校验 = 签名/时间窗（core.auth.signature.verify）+ nonce 去重（Redis SETNX）。
-    Redis 不可用时退化为"仅时间窗"，并只告警一次——可用性优先，但运维需知晓安全性下降。
+    密钥缺失或 Redis 不可用时默认降级放行并各告警一次；AUTH_HMAC_FAIL_CLOSED=True
+    时改为拒绝请求，避免安全敏感部署在依赖故障时静默失去防重放能力。
     """
 
     def __init__(self, app: Any) -> None:
         self.app = app
+        self._no_secret_warned = False
         self._no_redis_warned = False
 
     async def __call__(self, scope: dict, receive: Callable, send: Callable) -> None:
@@ -111,10 +116,13 @@ class AuthSignatureMiddleware:
 
         secrets = [s for s in (config.AUTH_HMAC_SECRET, config.AUTH_HMAC_SECRET_PREV) if s]
         if not secrets:
-            # 开了开关却没配密钥：等同未开启，明确告警一次，避免"以为在防护其实没有"
-            if not self._no_redis_warned:
-                self._no_redis_warned = True
+            # 开了开关却没配密钥：等同未开启，告警一次，避免"以为在防护其实没有"
+            if not self._no_secret_warned:
+                self._no_secret_warned = True
                 logger.warning('AUTH_HMAC_ENABLED=True 但未配置 AUTH_HMAC_SECRET，签名校验实际未生效')
+            if config.AUTH_HMAC_FAIL_CLOSED:
+                await self._unauthorized(send, '服务未配置签名密钥')
+                return
             await self.app(scope, receive, send)
             return
 
@@ -136,12 +144,14 @@ class AuthSignatureMiddleware:
         r = app_state.redis
         if r is None:
             self._warn_redis_once()
-            return None
+            return 'nonce 去重不可用' if config.AUTH_HMAC_FAIL_CLOSED else None
         try:
             ok = await r.set(auth_nonce_key(nonce), '1', nx=True, ex=KeyTTL.AUTH_NONCE)
-        except Exception as e:  # noqa: BLE001  Redis 故障不阻断请求，降级为仅时间窗
-            logger.warning(f'nonce 去重失败，降级为仅校验时间窗: {e}')
-            return None
+        except Exception as e:  # noqa: BLE001  Redis 故障默认降级，仅时间窗；fail-closed 时拒绝
+            if not self._no_redis_warned:
+                logger.warning(f'nonce 去重失败，降级为仅校验时间窗: {e}')
+                self._no_redis_warned = True
+            return 'nonce 去重不可用' if config.AUTH_HMAC_FAIL_CLOSED else None
         return None if ok else 'nonce 已使用（疑似重放）'
 
     def _warn_redis_once(self) -> None:

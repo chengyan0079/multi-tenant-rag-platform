@@ -15,8 +15,7 @@ from langchain_core.document_loaders import BaseLoader
 from langchain_core.documents import Document
 from tqdm import tqdm
 
-from common.config import config
-from common.logger import logger, setup_logging
+from common.logger import logger
 from core.rag_indexer.document_loaders.ocr import get_ocr_instance
 
 
@@ -87,11 +86,3 @@ class OCRDocxLoader(BaseLoader):
 
         pro_bar.close()
         return '\n'.join(extracted_chunks)
-
-
-if __name__ == '__main__':
-    setup_logging()
-    docx_loader = OCRDocxLoader(filepath=str(config.FILES_DIR / '人工智能就业课课程大纲.docx'))
-    docs = docx_loader.load()
-    logger.info(docs)
-    logger.info(len(docs[0].page_content))

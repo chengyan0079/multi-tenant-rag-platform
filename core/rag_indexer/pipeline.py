@@ -1,4 +1,5 @@
 """单文档索引聚合入口：取对象字节 → 落临时目录 → 父子块切分 → 写 PG(rag_chunk) → 向量化写 Milvus；状态回写由 run_index_job 处理。消费侧为 index_manager（Redis 队列），换 Celery/ARQ 只替换投递与消费。"""
+import asyncio
 import json
 import os
 import shutil
@@ -13,6 +14,8 @@ from core.rag_indexer.document_processor import process_documents
 from store.doc_dao import DocDao
 from store.milvus_store import stable_chunk_id
 from store.redis_keys import index_queue_key
+
+_background_tasks: set[asyncio.Task] = set()
 
 
 def _decode_text(data: bytes) -> str:
@@ -75,12 +78,10 @@ async def build_index(tenant_id: int, doc_id: int, oss_key: str, file_name: str,
             })
 
         dao = DocDao()
-        # 先取下一个版本号，保证 PG 与 Milvus 主键（含 version）一致
-        version = await dao.next_version(tenant_id, doc_id)
+        # 落 PostgreSQL 元数据：版本在行锁内分配，返回实际版本供 Milvus 主键使用
+        version, _ = await dao.save_chunks(tenant_id, doc_id, scope, chunks)
         old_version = version - 1
 
-        # 落 PostgreSQL 元数据：旧版本 soft-delete，新版本插入（幂等 + 可回滚）
-        await dao.save_chunks(tenant_id, doc_id, scope, chunks, version=version)
         # 向量化 + 写 Milvus（add_chunks 内部 embed + upsert；chunk_id 含 version 互不冲突）
         store = app_state.milvus_store
         if store is None:
@@ -113,11 +114,11 @@ async def run_index_job(tenant_id: int, doc_id: int, oss_key: str, file_name: st
     """执行一次索引任务并回写状态：0 待解析 → 1 解析中 → 2 完成 / 3 失败。"""
     dao = DocDao()
     try:
-        await dao.update_status(doc_id, 1)
+        await dao.update_status(tenant_id, doc_id, 1)
         # doc_type 2=复盘文本，向量仍按普通文档入库（scope=0）；入图是附加动作
         scope = 1 if doc_type == 1 else 0
         n = await build_index(tenant_id, doc_id, oss_key, file_name, scope=scope)
-        await dao.update_status(doc_id, 2, chunk_count=n)
+        await dao.update_status(tenant_id, doc_id, 2, chunk_count=n)
         logger.info(f'文档索引完成 [doc_id={doc_id} tenant={tenant_id} chunks={n}]')
         # 复盘文本入图：独立兜底，失败只告警，不改变已完成的索引状态
         if doc_type == 2 and config.GRAPH_INGEST_ENABLED:
@@ -127,7 +128,7 @@ async def run_index_job(tenant_id: int, doc_id: int, oss_key: str, file_name: st
                 logger.exception(f'复盘文本入图失败 [doc_id={doc_id} tenant={tenant_id}]')
     except Exception as e:  # noqa: BLE001
         logger.exception(f'文档索引失败 [doc_id={doc_id} tenant={tenant_id}]')
-        await dao.update_status(doc_id, 3, err_msg=f'索引失败：{e}'[:512])
+        await dao.update_status(tenant_id, doc_id, 3, err_msg=f'索引失败：{e}'[:512])
 
 
 async def rollback_index_version(tenant_id: int, doc_id: int, target_version: int) -> int:
@@ -147,7 +148,7 @@ async def rollback_index_version(tenant_id: int, doc_id: int, target_version: in
         raise ValueError(f'目标版本无切片，无法回滚: doc={doc_id} version={target_version}')
 
     # 当前生效版本：从文档记录取（回滚前仍是它）；scope 按文档类型对齐，避免 FAQ 文档错配
-    current = await dao.get_status(doc_id)
+    current = await dao.get_status(tenant_id, doc_id)
     current_version = current.get('version', target_version)
     scope = 1 if current.get('doc_type', 0) == 1 else 0
 
@@ -191,7 +192,8 @@ async def enqueue_index(tenant_id: int, doc_id: int, oss_key: str, file_name: st
             return
         except Exception:  # noqa: BLE001
             logger.warning('索引任务入队失败，降级为进程内执行')
-    # 降级：直接后台跑（单进程自测 / Redis 不可用时）
-    import asyncio
-    asyncio.create_task(
+    # 降级：直接后台跑（Redis 不可用时）。持有 task 引用，避免被 GC 提前回收。
+    task = asyncio.create_task(
         run_index_job(tenant_id, doc_id, oss_key, file_name, doc_type))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)

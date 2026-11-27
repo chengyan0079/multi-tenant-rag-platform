@@ -1,9 +1,4 @@
-"""
-test_session_store_turn - 问答明细（rag_turn）持久化单测（pytest + mock）
-
-覆盖 docs/会话记录持久化设计方案.md §5 的数据结构与写入行为：
-turn 元素结构、片段只存引用、Redis 追加与裁剪、数据库落库幂等、删会话联动。
-"""
+"""问答明细（rag_turn）持久化单测：片段只存引用、Redis 追加与裁剪、落库幂等、删会话联动。"""
 import asyncio
 import os
 import sys

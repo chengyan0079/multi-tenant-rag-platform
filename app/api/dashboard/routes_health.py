@@ -12,8 +12,8 @@ router = APIRouter(tags=["health"])
 async def health():
     """健康检查（含 Milvus/PostgreSQL/Redis/Model/MCP/Nacos/配置中心/故障图谱），供 nacos 探活。
 
-    除基础组件外，新增项均取自内存状态、不做网络探测：
-    MCP/Nacos/配置中心/故障图谱各自判断是否就绪。未启用的能力为 False，不影响 status。
+    Redis/PostgreSQL/Milvus 做真实探测；其余组件取 Manager 维护的状态。
+    未启用的能力为 False，不影响 status。
     """
     result = await HealthDao().check()
     return success(HealthData(status="ok", **result))

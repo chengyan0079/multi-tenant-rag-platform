@@ -244,23 +244,23 @@ def test_doc_dao():
     assert sess.committed == 1
 
     # get_status: 返回 {status, chunk_count, err_msg}
-    d = Doc(id=7, tenant_id=1, status=2, chunk_count=4, err_msg=None)
+    d = Doc(id=7, tenant_id=1, status=2, chunk_count=4, err_msg=None, doc_type=0)
     sess2 = _FakeSession(exec_results=[_Result(d)])
-    assert asyncio.run(DocDao(factory=lambda: sess2).get_status(7)) == {
-        "status": 2, "chunk_count": 4, "err_msg": None}
+    assert asyncio.run(DocDao(factory=lambda: sess2).get_status(1, 7)) == {
+        "status": 2, "chunk_count": 4, "err_msg": None, "version": None, "doc_type": 0}
 
     # update_status: 回写状态（含 err_msg 截断）
     d3 = Doc(id=7, tenant_id=1, status=0)
     sess3 = _FakeSession(exec_results=[_Result(d3)])
-    asyncio.run(DocDao(factory=lambda: sess3).update_status(7, 3, chunk_count=2, err_msg="boom"))
+    asyncio.run(DocDao(factory=lambda: sess3).update_status(1, 7, 3, chunk_count=2, err_msg="boom"))
     assert d3.status == 3 and d3.chunk_count == 2 and d3.err_msg == "boom"
 
-    # save_chunks: 先删后插，幂等
+    # save_chunks: 锁文档行 → 分配版本 → 先删后插，返回 (version, count)
     chunks = [{"text": "t1", "parent_id": "p0", "parent_content": "pc",
                "doc_name": "f.pdf", "page": 0, "ref_id": 0}]
-    sess4 = _FakeSession(exec_results=[_Result(None)])
-    n = asyncio.run(DocDao(factory=lambda: sess4).save_chunks(1, 7, 0, chunks))
-    assert n == 1 and len(sess4.added) == 1 and sess4.committed == 1
+    sess4 = _FakeSession(exec_results=[_Result(7), _Result(None), _Result(None), _Result(None)])
+    version, n = asyncio.run(DocDao(factory=lambda: sess4).save_chunks(1, 7, 0, chunks))
+    assert (version, n) == (1, 1) and len(sess4.added) == 1 and sess4.committed == 1
 
 
 def test_health_dao(monkeypatch):
@@ -276,8 +276,8 @@ def test_health_dao(monkeypatch):
         async def has_collection(self, name):
             return True
 
-    monkeypatch.setattr(health_dao_module, "redis_ping", _redis)
-    monkeypatch.setattr(health_dao_module, "db_ping", _pg)
+    monkeypatch.setattr(health_dao_module, "_redis_ping", _redis)
+    monkeypatch.setattr(health_dao_module, "_db_ping", _pg)
     class _Store:
         client = _Milvus()
     monkeypatch.setattr(app_state, "milvus_store", _Store())
@@ -295,8 +295,8 @@ def test_health_dao_extra_components(monkeypatch):
     async def _no():
         return False
 
-    monkeypatch.setattr(health_dao_module, "redis_ping", _no)
-    monkeypatch.setattr(health_dao_module, "db_ping", _no)
+    monkeypatch.setattr(health_dao_module, "_redis_ping", _no)
+    monkeypatch.setattr(health_dao_module, "_db_ping", _no)
     monkeypatch.setattr(app_state, "milvus_store", None)
     monkeypatch.setattr(app_state, "model_service", None)
 

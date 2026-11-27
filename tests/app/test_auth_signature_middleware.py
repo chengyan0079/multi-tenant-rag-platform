@@ -55,6 +55,7 @@ def _auth_on(monkeypatch):
     monkeypatch.setattr(config, 'AUTH_HMAC_SECRET', SECRET)
     monkeypatch.setattr(config, 'AUTH_HMAC_SECRET_PREV', '')
     monkeypatch.setattr(config, 'AUTH_HMAC_TTL', 60)
+    monkeypatch.setattr(config, 'AUTH_HMAC_FAIL_CLOSED', False)
     redis = _FakeRedis()
     monkeypatch.setattr(app_state, 'redis', redis)
     yield redis
@@ -133,6 +134,7 @@ def test_enabled_without_secret_warns_and_passes(monkeypatch) -> None:
     monkeypatch.setattr(config, 'AUTH_HMAC_ENABLED', True)
     monkeypatch.setattr(config, 'AUTH_HMAC_SECRET', '')
     monkeypatch.setattr(config, 'AUTH_HMAC_SECRET_PREV', '')
+    monkeypatch.setattr(config, 'AUTH_HMAC_FAIL_CLOSED', False)
     assert TestClient(_make_app()).get('/ping').status_code == 200
 
 
@@ -141,3 +143,21 @@ def test_old_secret_still_accepted(_auth_on, monkeypatch) -> None:
     monkeypatch.setattr(config, 'AUTH_HMAC_SECRET_PREV', 'oldsecret')
     headers = _signed('GET', '/ping', secret='oldsecret')
     assert TestClient(_make_app()).get('/ping', headers=headers).status_code == 200
+
+
+def test_fail_closed_rejects_when_redis_down(_auth_on, monkeypatch) -> None:
+    """开启 fail-closed 后 Redis 不可用要拒绝，不再退化成只校验时间窗。"""
+    monkeypatch.setattr(config, 'AUTH_HMAC_FAIL_CLOSED', True)
+    monkeypatch.setattr(app_state, 'redis', _BrokenRedis())
+    r = TestClient(_make_app()).get('/ping', headers=_signed('GET', '/ping'))
+    assert r.status_code == 401
+    assert 'nonce 去重不可用' in r.json()['msg']
+
+
+def test_fail_closed_rejects_without_secret(monkeypatch) -> None:
+    """开启 fail-closed 后未配密钥要拒绝所有请求。"""
+    monkeypatch.setattr(config, 'AUTH_HMAC_ENABLED', True)
+    monkeypatch.setattr(config, 'AUTH_HMAC_SECRET', '')
+    monkeypatch.setattr(config, 'AUTH_HMAC_SECRET_PREV', '')
+    monkeypatch.setattr(config, 'AUTH_HMAC_FAIL_CLOSED', True)
+    assert TestClient(_make_app()).get('/ping').status_code == 401

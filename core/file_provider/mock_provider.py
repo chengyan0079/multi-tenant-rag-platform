@@ -1,4 +1,4 @@
-"""Mock 文件提供者（本地临时目录兜底，无对象存储环境用）。对象路径/租户前缀由 provider 模块统一构造。"""
+"""本地目录文件提供者（MINIO_ENABLED=False 时启用）。对象路径/租户前缀由 provider 模块统一构造。"""
 import base64
 import os
 from datetime import datetime, timedelta

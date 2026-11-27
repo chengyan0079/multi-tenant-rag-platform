@@ -38,7 +38,7 @@ nacos-sdk-python>=2
 sse-starlette
 python-multipart
 
-# --- 模型推理依赖（向量/重排/意图分类需要；按部署环境选 CPU/GPU）---
-# 例：pip install torch --index-url https://download.pytorch.org/whl/cpu
-# torch
-# transformers
+# --- 模型推理依赖（向量/重排/意图分类需要）---
+# GPU 环境按需替换 torch 源：pip install torch --index-url https://download.pytorch.org/whl/cu121
+torch
+transformers
